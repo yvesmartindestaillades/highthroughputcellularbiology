@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import datetime
+import config
 
 def fasta_to_df(fasta_file):
     """Converts a fasta file to a pandas dataframe"""
@@ -32,10 +33,11 @@ def savefig(file:str, close=True)->None:
         # Closes all the figure windows.
         plt.close('all')   
         
-def savefig2(cwd, filename, close=True):
-    path = os.path.join('../..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('.')[0], version+'_'+filename)
+def savefig2(cwd, filename):
+    cwd = os.path.normpath(cwd)
+    path = os.path.join('..','..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('-')[0], *(config.version+'-'+filename).split('/')[:-1])
     path = make_path(path)
-    savefig(path, close=close)
+    savefig(path+(config.version+'-'+filename).split('/')[-1]+'.png', close=config.generate_plots)
 
 def make_path(path:str)->str:
     """Create directories until path exists on your computer. Turns the keyword 'date' into today's date.

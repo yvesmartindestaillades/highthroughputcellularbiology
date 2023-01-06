@@ -1,4 +1,4 @@
-from util import *
+import numpy as np
 
 version = 'v0.0'
 generate_plots = True
