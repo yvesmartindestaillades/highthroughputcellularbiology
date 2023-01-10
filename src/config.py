@@ -1,7 +1,9 @@
-from util import *
+import numpy as np
+import sys
+import json
 
 version = 'v0.0'
-generate_plots = True
+generate_plots = False
 
 LAH = 'CACAGTCGAAAGACTGTG'
 MS2= 'GCATATGAGGATCACCCATATGC'
@@ -20,3 +22,10 @@ boundary = {
     'barcode': lambda s: [139, 151],
     'full': lambda s: [0, len(s)],
 }
+
+sys.path.append('/Users/ymdt/src/dreem')
+import dreem
+
+study = dreem.draw.study.Study(
+    data = json.load(open('/Users/ymdt/src/highthroughputcellularbiology/data/474DMS.json', 'r'))
+)
