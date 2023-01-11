@@ -4,7 +4,9 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import datetime
-import config
+from config import version, generate_plots
+from scipy import stats
+from sklearn.linear_model import LinearRegression
 
 def fasta_to_df(fasta_file):
     """Converts a fasta file to a pandas dataframe"""
@@ -35,9 +37,9 @@ def savefig(file:str, close=True)->None:
         
 def savefig2(cwd, filename):
     cwd = os.path.normpath(cwd)
-    path = os.path.join('..','..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('-')[0], *(config.version+'-'+filename).split('/')[:-1])
+    path = os.path.join('..','..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('-')[0], *(version+'-'+filename).split('/')[:-1])
     path = make_path(path)
-    savefig(path+(config.version+'-'+filename).split('/')[-1]+'.png', close=config.generate_plots)
+    savefig(path+(version+'-'+filename).split('/')[-1]+'.png', close=generate_plots)
 
 def make_path(path:str)->str:
     """Create directories until path exists on your computer. Turns the keyword 'date' into today's date.
@@ -61,3 +63,71 @@ def make_path(path:str)->str:
         if not os.path.exists(full_path):
             os.mkdir(full_path)
     return full_path
+
+def compute_mutation_rates(df):
+    """Compute the mutation rate for each column of a dataframe.
+    mutation_rate = (# of mutations) / (# of reads). Ignore missing values.
+    """
+    mut_rates = []
+    for col in df.columns:
+        col = df[col]
+        num_of_mutations = col[col.notna()].astype(int).sum()
+        num_of_reads = col[col.notna()].astype(int).count()
+        mut_rate = round(num_of_mutations / num_of_reads, 6)
+        mut_rates.append(mut_rate)
+    return mut_rates
+
+def bitvector_to_df(path, *args, **kwargs):
+    df = pd.read_csv(path, *args, **kwargs)['Bit_vector']
+    df = df.str.split('', expand=True).drop(columns=[0, 171])
+    values_map = {
+        'A': 1,
+        'C': 1,
+        'G': 1,
+        'T': 1,
+        'N': 1,
+        '1': 1,
+        '0': 0,
+        '?': np.nan,
+        '.': np.nan
+    }
+    df = df.applymap(lambda x: values_map[x])
+    return df
+
+def findall(sub, string):
+    """
+    >>> text = "Allowed Hello Hollow"
+    >>> tuple(findall('ll', text))
+    (1, 10, 16)
+    """
+    index = 0 - len(sub)
+    try:
+        while True:
+            index = string.index(sub, index + len(sub))
+            yield index
+    except ValueError:
+        pass
+
+def custom_pearsonr(x, y, percentile=90, diff_filter=0.2):
+    min_unique = min(len(np.unique(x)), len(np.unique(y)))
+    if min_unique == 0:
+        return np.nan
+    if len(x) != len(y):
+        raise ValueError('x and y must have the same length')
+    x , y = x[~np.isnan(x) & ~np.isnan(y)], y[~np.isnan(x) & ~np.isnan(y)]
+    if min_unique == 1:
+        return np.nan
+    if min_unique == 2:
+        return stats.pearsonr(x, y)[0]
+    else:
+        model = LinearRegression()
+        model.fit(x.reshape(-1,1), y)
+        std_err_per_data_point = np.abs(y - model.predict(x.reshape(-1,1)))
+        score_all = stats.pearsonr(x, y)[0]
+        idx_keep = np.where(std_err_per_data_point < np.percentile(std_err_per_data_point, percentile))[0]
+        min_unique = min(len(np.unique(x.take(idx_keep))), len(np.unique(y.take(idx_keep))))
+        if min_unique >=2:
+            score_filter_worst_data_point = stats.pearsonr(x.take(idx_keep), y.take(idx_keep))[0]
+            if score_filter_worst_data_point - score_all > diff_filter:
+                return score_filter_worst_data_point    
+        return score_all
