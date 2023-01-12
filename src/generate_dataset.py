@@ -3,16 +3,15 @@ import numpy as np
 from util import findall, custom_pearsonr
 
 def generate_barcode_replicates_pairs(study, sample):
-    data = study.get_df(sample=sample, section = 'ROI')
+    data = study.get_df(sample=sample, section = 'ROI')[['sequence', 'construct']]
     replicates = {}
-    for construct in study.get_constructs(sample):
-        sequence = study.get_df(sample=sample, construct=construct, section='ROI')['sequence'].values[0]
-        replicates[construct] = []
-        for _, row in data.iterrows():
-            if row['sequence'] == sequence and row['construct'] != construct:
-                replicates[construct].append(row['construct'])
-        if len(replicates[construct]) == 0:
-            del replicates[construct]
+    for _, g in data.groupby('sequence'):
+        if len(g) > 1:
+            for _, row in g.iterrows():
+                replicates[row['construct']] = []
+                for _, row2 in g.iterrows():
+                    if row2['construct'] != row['construct']:
+                        replicates[row['construct']].append(row2['construct'])
     return replicates
 
 

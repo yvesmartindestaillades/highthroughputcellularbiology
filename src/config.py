@@ -5,10 +5,11 @@ import pandas as pd
 import matplotlib
 sys.path.append('../../')
 
-matplotlib.use('agg')
-
 version = 'v0.1'
 generate_plots = False
+if generate_plots:
+    matplotlib.use('agg')
+
 min_base_coverage = 1000
 
 LAH = 'CACAGTCGAAAGACTGTG'
@@ -28,7 +29,7 @@ boundary = {
 sys.path.append('/Users/ymdt/src/dreem')
 import dreem
 
-path_data = '../../data/dreem_output/'
+path_data = '../../data/'
 saved_feather = path_data+'df.feather'
 
 if not os.path.exists(saved_feather):

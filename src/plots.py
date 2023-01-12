@@ -31,7 +31,6 @@ def mutations_in_barcodes(study, sample):
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
     plt.hist(num_aligned_reads, bins=np.arange(500,max(num_aligned_reads), 1000), rwidth=0.9)
-    plt.grid()
     plt.xlabel('Number of reads (binned)')
     plt.ylabel('Number of constructs')
     plt.title('Number of aligned reads per construct freq. distrib. - {}'.format(sample))
@@ -44,7 +43,6 @@ def num_aligned_reads_per_construct(study, sample):
     plt.xlabel('Number of constructs')
     plt.ylabel('Number of reads')
     plt.title('Number of aligned reads per construct - {}'.format(sample))
-    plt.grid()
     
 # ---------------------------------------------------------------------------
 
@@ -57,9 +55,7 @@ def mutations_per_read(study, sample):
         all_mutations += list(read)
     x = np.arange(0, max(all_mutations), 10)
     plt.hist(all_mutations, rwidth=0.9, bins=x)
-    plt.yscale('log')
     plt.xticks(x)
-    plt.grid()
     plt.xlabel('Number of mutations per read')
     plt.ylabel('Count')
     plt.title('Mutations per read - {}'.format(sample))
@@ -152,12 +148,14 @@ def barcode_comparison_scatter_plot(study, sample, construct, replicate):
     # plot regression line
     x, y = np.array(X), np.array(Y)
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+    # compute R2
+    r2 = r_value**2
     plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='Linear regression')
     
     # plot labels
     plt.title('Barcodes comparison - {}'.format(sample))
     plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r_value), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
     plt.xlabel('Barcode: %s' % construct)
     plt.ylabel('Barcode: %s' % replicate)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
@@ -187,7 +185,7 @@ def barcode_replicates(study, sample):
 
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
-def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
+def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     # get data
     data = study.get_df(
         sample = samples,
@@ -195,7 +193,7 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
         section='ROI',
         base_type = ['A','C']) 
 
-    data = data[['sequence','mut_rates','index_selected','structure','temperature_k']]
+    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
     
     if len(data) == 0:
         print('No data: {}, {}'.format(samples, construct))
@@ -205,15 +203,32 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     df = pd.DataFrame(
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
         data = np.array(data['mut_rates'].tolist()),
-        index= data['temperature_k'].values
+        index= data[attr].values
     )
     
     # plot
     paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
-    df.plot(style= ['-x' if paired[idx] else '-o' for idx in range(len(paired))])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.title(construct)
-    plt.xlabel('Time (secs)')
+    
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Construct: {}'.format(construct))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
+    return df
+
+def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
+    
+def change_in_reaction_time(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'inc_time_tot_secs', 'DMS incubation time (s)')
+
+def change_in_dms_conc(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'DMS_conc_mM', 'DMS concentration (mM)')
 
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
@@ -237,12 +252,17 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
     # differentiate between paired and unpaired bases
     paired = [residue for idx, residue in enumerate([False if residue == '.' else True for residue in data['structure'].iloc[0]]) if idx_AC[idx]]
     
-    # plot
-    df.plot(style= ['-x' if paired[idx] else '-o' for idx in range(len(paired))])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.title('Changement in temperature (w/ prediction) for ' + family + ' in ' + sample)
-    plt.xlabel('ΔG (kcal/mol)')
-    plt.ylabel('Mutation rate')
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Sample: {}, Family: {}'.format(sample, family))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel('Predicted free energy (kcal/mol)')
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
+    return df
     
 # ---------------------------------------------------------------------------
 
