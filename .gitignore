@@ -132,3 +132,6 @@ data/*
 figs/*
 
 .DS_Store
+
+*.zip
+path.py

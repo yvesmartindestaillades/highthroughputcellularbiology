@@ -3,10 +3,11 @@ import sys, os
 import json
 import pandas as pd
 import matplotlib
+sys.path.append('../../')
 
 matplotlib.use('agg')
 
-version = 'v0.0'
+version = 'v0.1'
 generate_plots = True
 min_base_coverage = 1000
 
@@ -24,19 +25,21 @@ boundary = {
     'barcode': lambda s: [139, 151],
     'full': lambda s: [0, len(s)],
 }
-
 sys.path.append('/Users/ymdt/src/dreem')
 import dreem
 
-path_data = '/Users/ymdt/src/highthroughputcellularbiology/data/dreem_output/'
+path_data = '../../data/dreem_output/'
 saved_feather = path_data+'df.feather'
 
 if not os.path.exists(saved_feather):
     study = dreem.draw.study.Study(
         data = [json.load(open(path_data + f, 'r')) for f in os.listdir(path_data) if f.endswith('.json')]
     )
+    study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
+    study.df.to_feather(saved_feather)
 else:
     study = dreem.draw.study.Study()
     study.df = pd.read_feather(saved_feather)
 
 study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage]
+

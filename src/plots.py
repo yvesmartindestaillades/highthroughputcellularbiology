@@ -9,6 +9,8 @@ import scipy.stats
 import sklearn.metrics
 import generate_dataset
 import seaborn as sns
+# pearsonr = scipy.stats.pearsonr
+import scipy.stats
 
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
@@ -174,7 +176,7 @@ def combined_barcode_replicates_in_sample(study, sample):
 ## c / iv - Reproducibility
 # ---------------------------------------------------------------------------
 def barcode_replicates(study, sample):
-    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
+    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)   
     pearson_scores = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
     plt.hist(pearson_scores, rwidth=0.9)
     plt.xlabel('Pearson correlation score average across barcode replicates')
@@ -269,3 +271,4 @@ def heatmap_across_family_members(study, sample, family):
     sns.heatmap(df, annot=True, fmt='.2f')
     plt.title('Heatmap across family members with all bases - sample {} - family {}'.format(sample, family))
     plt.ylabel('Construct')
+

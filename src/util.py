@@ -111,6 +111,7 @@ def findall(sub, string):
         pass
 
 def custom_pearsonr(x, y, percentile=90, diff_filter=0.2):
+    x, y = np.array(x), np.array(y)
     min_unique = min(len(np.unique(x)), len(np.unique(y)))
     if min_unique == 0:
         return np.nan
