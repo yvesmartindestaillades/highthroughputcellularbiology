@@ -21,7 +21,6 @@ def mutations_in_barcodes(study, sample):
         all_mutations += list(read)
     
     plt.hist(all_mutations, rwidth=0.9, bins=np.arange(-0.5, 0.5+max(all_mutations), 1))
-    plt.yscale('log')
     plt.xticks(np.arange(0, max(all_mutations)))
     plt.grid()
     plt.xlabel('Number of mutations on the barcode')
@@ -152,12 +151,14 @@ def barcode_comparison_scatter_plot(study, sample, construct, replicate):
     # plot regression line
     x, y = np.array(X), np.array(Y)
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+    # compute R2
+    r2 = r_value**2
     plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='Linear regression')
     
     # plot labels
     plt.title('Barcodes comparison - {}'.format(sample))
     plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r_value), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
     plt.xlabel('Barcode: %s' % construct)
     plt.ylabel('Barcode: %s' % replicate)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
