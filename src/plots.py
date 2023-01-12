@@ -192,7 +192,7 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
         section='ROI',
         base_type = ['A','C']) 
 
-    data = data[['sequence','mut_rates','index_selected','structure','temperature_k']]
+    data = data[['sample','sequence','mut_rates','index_selected','structure','temperature_k']]
     
     if len(data) == 0:
         print('No data: {}, {}'.format(samples, construct))
@@ -210,7 +210,8 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     df.plot(style= ['-x' if paired[idx] else '-o' for idx in range(len(paired))])
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.title(construct)
-    plt.xlabel('Time (secs)')
+    plt.xlabel('Temperature (K)')
+    return df
 
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
@@ -234,12 +235,17 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
     # differentiate between paired and unpaired bases
     paired = [residue for idx, residue in enumerate([False if residue == '.' else True for residue in data['structure'].iloc[0]]) if idx_AC[idx]]
     
-    # plot
-    df.plot(style= ['-x' if paired[idx] else '-o' for idx in range(len(paired))])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.title('Changement in temperature (w/ prediction) for ' + family + ' in ' + sample)
-    plt.xlabel('ΔG (kcal/mol)')
-    plt.ylabel('Mutation rate')
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Sample: {}, Family: {}'.format(sample, family))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel('Predicted free energy (kcal/mol)')
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
+    return df
     
 # ---------------------------------------------------------------------------
 
