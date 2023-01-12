@@ -184,7 +184,7 @@ def barcode_replicates(study, sample):
 
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
-def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
+def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     # get data
     data = study.get_df(
         sample = samples,
@@ -192,7 +192,7 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
         section='ROI',
         base_type = ['A','C']) 
 
-    data = data[['sample','sequence','mut_rates','index_selected','structure','temperature_k']]
+    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
     
     if len(data) == 0:
         print('No data: {}, {}'.format(samples, construct))
@@ -202,16 +202,32 @@ def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     df = pd.DataFrame(
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
         data = np.array(data['mut_rates'].tolist()),
-        index= data['temperature_k'].values
+        index= data[attr].values
     )
     
     # plot
     paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
-    df.plot(style= ['-x' if paired[idx] else '-o' for idx in range(len(paired))])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.title(construct)
-    plt.xlabel('Temperature (K)')
+    
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Construct: {}'.format(construct))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
     return df
+
+def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
+    
+def change_in_reaction_time(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'inc_time_tot_secs', 'DMS incubation time (s)')
+
+def change_in_dms_conc(study, samples, construct):
+    __mut_frac_vs_sample_attr(study, samples, construct, 'DMS_conc_mM', 'DMS concentration (mM)')
 
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
