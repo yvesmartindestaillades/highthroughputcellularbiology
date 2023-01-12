@@ -12,6 +12,8 @@ import seaborn as sns
 # pearsonr = scipy.stats.pearsonr
 import scipy.stats
 
+import plotly.graph_objects as go
+
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
 def mutations_in_barcodes(study, sample):
@@ -19,14 +21,12 @@ def mutations_in_barcodes(study, sample):
     all_mutations = []
     for read in bc_reads:
         all_mutations += list(read)
-    
-    plt.hist(all_mutations, rwidth=0.9, bins=np.arange(-0.5, 0.5+max(all_mutations), 1))
-    plt.yscale('log')
-    plt.xticks(np.arange(0, max(all_mutations)))
-    plt.grid()
-    plt.xlabel('Number of mutations on the barcode')
-    plt.ylabel('Count')
-    plt.title('Mutations in barcodes - {}'.format(sample))
+
+    hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
+
+
+    graph = go.Bar( x=bin_edges, y=hist, name='Mutations in barcodes - {}'.format(sample), showlegend=False, marker_color='indianred')
+    return graph
 
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()

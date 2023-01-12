@@ -19,6 +19,21 @@ def fasta_to_df(fasta_file):
     seqs = [l for l in lines if not l.startswith('>')]
     return pd.DataFrame({'construct': names, 'sequence': seqs})
 
+def save_plotly_fig(cwd, filename, fig):
+    """Save a plotly figure and create the directory if it doesn't exists.
+
+    Args:
+        cwd: directory
+        filename: name of the html file
+        fig: plotly figure
+    """
+
+    cwd = os.path.normpath(cwd)
+    path = os.path.join('..','..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('-')[0], *(version+'-'+filename).split('/')[:-1])
+    path = make_path(path)
+
+    fig.write_html(path+(version+'-'+filename).split('/')[-1]+'.html', full_html=True)
+
 def savefig(file:str, close=True)->None:
     """Save a matplotlib figure and create the directory if it doesn't exists.
 

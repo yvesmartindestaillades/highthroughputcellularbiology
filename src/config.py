@@ -8,7 +8,7 @@ sys.path.append('../../')
 matplotlib.use('agg')
 
 version = 'v0.1'
-generate_plots = True
+generate_plots = False
 min_base_coverage = 1000
 
 LAH = 'CACAGTCGAAAGACTGTG'
