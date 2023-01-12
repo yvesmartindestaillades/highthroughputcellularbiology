@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import datetime
 import config
 
+import mixem
+
 def fasta_to_df(fasta_file):
     """Converts a fasta file to a pandas dataframe"""
     with open(fasta_file, 'r') as f:
@@ -61,3 +63,49 @@ def make_path(path:str)->str:
         if not os.path.exists(full_path):
             os.mkdir(full_path)
     return full_path
+
+
+class logGMM:
+
+    def __init__(self):
+        
+        self.weights = [] 
+        self.distributions = []
+        self.data = []
+
+    def fit_logGMM(self, data):
+        data = np.array(data)
+        self.data = data[data>0.0]
+
+        # Fit and plot log gaussian mixture
+        self.weights, self.distributions, log_likelihood = mixem.em(self.data, [
+            mixem.distribution.LogNormalDistribution(mu=-6, sigma=2.4),
+            mixem.distribution.LogNormalDistribution(mu=-2.7, sigma=0.1),
+            # mixem.distribution.NormalDistribution(mu=300, sigma=50),
+        ], initial_weights=[0.8, 0.2], progress_callback=None)
+
+    def get_pdf(self, x_axis):
+        return mixem.probability(x_axis, self.weights, self.distributions)
+
+    def find_midpoint(self, interval=[1e-3, 1e-1]):
+        x_search = np.linspace(interval[0], interval[1], 10000)
+
+        pdf1 = np.exp(self.distributions[0].log_density(x_search))
+        pdf2 = np.exp(self.distributions[1].log_density(x_search))
+
+        x_max_1 = np.argmax(pdf1)
+        x_max_2 = np.argmax(pdf2)
+
+        if x_max_1 < x_max_2:
+            interval = [x_max_1, x_max_2]
+        else:
+            interval = [x_max_2, x_max_1]
+
+        pdf_diff = np.abs(pdf1-pdf2)[interval[0]:interval[1]]
+        if pdf_diff.size >0:
+            return x_search[np.argmin(pdf_diff)]
+        else:
+            return 0.0
+
+    def get_mode(self, dist_idx):
+        return np.exp(self.distributions[dist_idx].mu - self.distributions[dist_idx].sigma**2)
