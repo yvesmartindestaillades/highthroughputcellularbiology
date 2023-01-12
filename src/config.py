@@ -1,15 +1,17 @@
 import numpy as np
-import sys
+import sys, os
 import json
+import pandas as pd
+import matplotlib
+
+matplotlib.use('agg')
 
 version = 'v0.0'
-generate_plots = False
+generate_plots = True
+min_base_coverage = 1000
 
 LAH = 'CACAGTCGAAAGACTGTG'
 MS2= 'GCATATGAGGATCACCCATATGC'
-
-LAH_idx = np.array([idx for idx, c in enumerate(list(LAH)) if c in ['A','C']])
-MS2_idx = np.array([idx for idx, c in enumerate(list(MS2)) if c in ['A','C']])
 
 # define boundaries for the sections
 boundary = {
@@ -26,6 +28,15 @@ boundary = {
 sys.path.append('/Users/ymdt/src/dreem')
 import dreem
 
-study = dreem.draw.study.Study(
-    data = json.load(open('/Users/ymdt/src/highthroughputcellularbiology/data/474DMS.json', 'r'))
-)
+path_data = '/Users/ymdt/src/highthroughputcellularbiology/data/dreem_output/'
+saved_feather = path_data+'df.feather'
+
+if not os.path.exists(saved_feather):
+    study = dreem.draw.study.Study(
+        data = [json.load(open(path_data + f, 'r')) for f in os.listdir(path_data) if f.endswith('.json')]
+    )
+else:
+    study = dreem.draw.study.Study()
+    study.df = pd.read_feather(saved_feather)
+
+study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage]
