@@ -30,7 +30,6 @@ def mutations_in_barcodes(study, sample):
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
     plt.hist(num_aligned_reads, bins=np.arange(500,max(num_aligned_reads), 1000), rwidth=0.9)
-    plt.grid()
     plt.xlabel('Number of reads (binned)')
     plt.ylabel('Number of constructs')
     plt.title('Number of aligned reads per construct freq. distrib. - {}'.format(sample))
@@ -43,7 +42,6 @@ def num_aligned_reads_per_construct(study, sample):
     plt.xlabel('Number of constructs')
     plt.ylabel('Number of reads')
     plt.title('Number of aligned reads per construct - {}'.format(sample))
-    plt.grid()
     
 # ---------------------------------------------------------------------------
 
@@ -56,9 +54,7 @@ def mutations_per_read(study, sample):
         all_mutations += list(read)
     x = np.arange(0, max(all_mutations), 10)
     plt.hist(all_mutations, rwidth=0.9, bins=x)
-    plt.yscale('log')
     plt.xticks(x)
-    plt.grid()
     plt.xlabel('Number of mutations per read')
     plt.ylabel('Count')
     plt.title('Mutations per read - {}'.format(sample))
