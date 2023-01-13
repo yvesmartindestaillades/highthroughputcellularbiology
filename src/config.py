@@ -29,12 +29,14 @@ boundary = {
 }
 
 bio_replicates_samples = [
- ['01_1_S22_reads','01_02_S23_reads'],
- ['05_1_S24_reads','05_2_S25_reads'],
- ['1_1_S26new_reads','1_2_S27new_reads'],
- ['2_1_s28new_reads','2_2_S29new_reads'],
- ['5_2_S31_reads','5_1_S30new_reads'],
- ['10_1_s32new_reads','10_2_s33new_reads']
+['lauren470_S1','18_DMS'],
+['lauren472_S3','19_DMS'],
+['01_1_S22_reads','01_02_S23_reads'],
+['05_1_S24_reads','05_2_S25_reads'],
+['1_1_S26new_reads','1_2_S27new_reads'],
+['2_1_s28new_reads','2_2_S29new_reads'],
+['5_2_S31_reads','5_1_S30new_reads'],
+['10_1_s32new_reads','10_2_s33new_reads']
  ] 
 
 reaction_time_samples = [
@@ -75,9 +77,10 @@ if not os.path.exists(saved_feather):
     study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
     study.df.to_feather(saved_feather)
 else:
-    
     study = dreem.draw.study.Study()
     study.df = pd.read_feather(saved_feather)
 
 study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage]
+# only keep the constructs that have all sections
 
+study.df = study.df.groupby(['sample', 'construct']).filter(lambda x: len(x) == 8)

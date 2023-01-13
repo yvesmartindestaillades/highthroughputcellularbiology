@@ -179,7 +179,9 @@ def barcode_comparison_scatter_plot(study, sample, construct, replicate):
 def combined_barcode_replicates_in_sample(study):
     
     data = {}
-    for sample in study.df['sample'].unique():
+    samples = study.df['sample'].unique()
+    samples.sort()
+    for sample in samples:
         replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
         data[sample] = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
     
@@ -187,11 +189,14 @@ def combined_barcode_replicates_in_sample(study):
 
     # Add trace for each sample and show only one sample at a time
     for sample in data.keys():
-        fig.add_trace(go.Box(
+        fig.add_trace(go.Bar(
             y = data[sample],
             name = sample,
             visible = False
         ))
+        
+    # set the first sample to be visible
+    fig.data[0].visible = True
     
     fig.layout.update(
         title = 'Combined barcodes replicates - {}'.format(sample),
@@ -200,17 +205,24 @@ def combined_barcode_replicates_in_sample(study):
     )
     
     # add a button to show/hide each sample
+    # the button should be on the right of the plot, outside of the plot
     fig.layout.updatemenus = [
         go.layout.Updatemenu(
-            active = 1,
+            active = 0,
             buttons = [
                 dict(
+                    args = [{'visible': [True if i==j else False for i in range(len(data.keys()))]}],
                     label = sample,
-                    method = 'update',
-                    args = [{'visible': [False] * len(data.keys())},
-                            {'title': 'Combined barcodes replicates - {}'.format(sample)}]
-                ) for sample in data.keys()
-            ]
+                    method = 'update'
+                ) for j, sample in enumerate(data.keys())
+            ],
+            direction = 'down',
+            pad = {'r': 10, 't': 10},
+            showactive = True,
+            x = 0.7,
+            xanchor = 'left',
+            y = 1.1,
+            yanchor = 'top'
         )
     ]
     

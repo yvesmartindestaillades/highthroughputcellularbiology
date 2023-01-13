@@ -135,3 +135,5 @@ figs/*
 
 *.zip
 path.py
+
+*.feather
