@@ -46,24 +46,31 @@ def mutations_per_read(study, sample):
     all_mutations = []
     for read in bc_reads:
         all_mutations += list(read)
-    x = np.arange(0, max(all_mutations), 10)
-    plt.hist(all_mutations, rwidth=0.9, bins=x)
-    plt.xticks(x)
-    plt.xlabel('Number of mutations per read')
-    plt.ylabel('Count')
-    plt.title('Mutations per read - {}'.format(sample))
+
+    hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
+    return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
 def mutation_identity_at_each_position(study, sample, construct):
-    data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
+    try:
+        data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
+    except:
+        print(sample, construct)
     df = pd.DataFrame(index = list(data['sequence']))
+    stacked_bar = []
+    color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
     for base in ['A','C','G','T']:
         df[base] = np.array(data['mod_bases_'+base])/np.array(data['info_bases'])
-    df.plot.bar(stacked=True, figsize= (20,4), color={'A':'r','C':'b','G':'y','T':'g'})
-    plt.xticks(rotation=0)
-    plt.xlabel('')
-    plt.ylabel('Mutation fraction')
-    plt.xlabel('Position')
-    plt.title('Mutation identity at each position - {} - {}'.format(sample, construct))
+        stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
+
+    return stacked_bar
+
+    # df.plot.bar(stacked=True, figsize= (20,4), color={'A':'r','C':'b','G':'y','T':'g'})
+    
+    # plt.xticks(rotation=0)
+    # plt.xlabel('')
+    # plt.ylabel('Mutation fraction')
+    # plt.xlabel('Position')
+    # plt.title('Mutation identity at each position - {} - {}'.format(sample, construct))
     
 def mutation_fraction_at_each_position(study, sample, construct):
     data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
