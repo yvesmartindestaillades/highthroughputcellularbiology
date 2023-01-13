@@ -11,8 +11,9 @@ import generate_dataset
 import seaborn as sns
 # pearsonr = scipy.stats.pearsonr
 import scipy.stats
-
+from sklearn.metrics import r2_score
 import plotly.graph_objects as go
+import plotly.express as px
 
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
@@ -128,30 +129,11 @@ def barcode_comparison_scatter_plot(study, sample, construct, replicate):
         y = study.get_df(sample = sample, construct = replicate, section = section, base_type = ['A','C'])['mut_rates'].iloc[0]
         plt.plot(x, y, 'x', label = section)
         X, Y = X + list(x), Y + list(y)
-        
-    # reshape plot
-    plt.axis('square')
-    (xmin, xmax), (ymin, ymax) = plt.xlim(), plt.ylim()
-    plt.xlim(min(xmin, ymin), max(xmax, ymax))
-    xmin, xmax = plt.xlim()
-    
-    # plot y=x line
-    plt.plot([xmin, xmax], [xmin, xmax], 'k--', label='y=x')
 
-    # plot regression line
-    x, y = np.array(X), np.array(Y)
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
-    # compute R2
-    r2 = r_value**2
-    plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='Linear regression')
-    
-    # plot labels
+    __correlation_scatter_plot(X,Y)
     plt.title('Barcodes comparison - {}'.format(sample))
-    plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
     plt.xlabel('Barcode: %s' % construct)
     plt.ylabel('Barcode: %s' % replicate)
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
     
     
 def combined_barcode_replicates_in_sample(study, sample):
@@ -174,45 +156,83 @@ def barcode_replicates(study, sample):
     plt.ylabel('Number of constructs')
     plt.title('Barcodes replicates - {}'.format(sample))
     
+def barcode_replicates_per_construct(study, samples, construct):
+    data = study.get_df(
+        sample= samples,
+        construct = construct,
+        base_type = ['A','C'],
+        section='full'
+        )
+    if not len(data) == 2:
+        return data
+    
+    plt.figure()
+    
+    plt.plot(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1], 'x')
+    
+    __correlation_scatter_plot(
+        x = data['mut_rates'].iloc[0],
+        y = data['mut_rates'].iloc[1]
+        )
+    
+    plt.title('Biological replicates - {} '.format(construct))
+    plt.xlabel(data['sample'].iloc[0])
+    plt.ylabel(data['sample'].iloc[1])
+    
+    
+def sample_replicates_heatmap_per_family(study, samples, family, section):
+    if section in ['LAH','MS2']:
+        
+        data = study.get_df(
+            sample=samples, 
+            section=section, 
+            family=family, 
+            base_type=['A','C'])
+        
+    if section == 'ROI':
+
+        data = study.get_df(
+            sample=samples, 
+            section=section, 
+            family=family)
+        
+    data = data[['sample','construct','mut_rates','frame_shift_ROI','sequence']]
+    
+    if section == 'ROI':
+        reference = data[data['sample'] == samples[0]].iloc[0]['sequence']
+        data['mut_rates'] = data.apply(lambda row: int(row['frame_shift_ROI'])*[np.nan] + list(row['mut_rates']) + (len(reference) - int(row['frame_shift_ROI']) - len(row['mut_rates']))*[np.nan], axis=1)
+
+    data_sample_0 = data[data['sample'] == samples[0]].reset_index(drop=True)
+    data_sample_1 = data[data['sample'] == samples[1]].reset_index(drop=True)
+
+    df = pd.DataFrame(
+        index = data_sample_0['construct'],
+        columns = data_sample_1['construct'], 
+    )
+        
+    for _, row in data_sample_0.iterrows():
+        for _, row2 in data_sample_1.iterrows():
+            df.loc[row['construct'], row2['construct']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
+                                
+    return px.imshow(
+                df, 
+                x=df.columns, 
+                y=df.index, 
+                color_continuous_scale='RdBu_r', 
+                zmin=-1, 
+                zmax=1, 
+                title='Pearson correlation between samples {} and {} (family {})'.format(samples[0], samples[1], family),
+                labels=dict(x='Sample {}'.format(samples[1]), y='Sample {}'.format(samples[0])),
+                width=800,
+                height=800,
+                text_auto = '.2f'
+                ).show() 
+        
 # ---------------------------------------------------------------------------
 
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
-def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
-    # get data
-    data = study.get_df(
-        sample = samples,
-        construct=construct,
-        section='ROI',
-        base_type = ['A','C']) 
 
-    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
-    
-    if len(data) == 0:
-        print('No data: {}, {}'.format(samples, construct))
-        return None
-    
-    # turn it into a dataframe
-    df = pd.DataFrame(
-        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = np.array(data['mut_rates'].tolist()),
-        index= data[attr].values
-    )
-    
-    # plot
-    paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
-    
-    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
-    plt.suptitle('Construct: {}'.format(construct))
-    for i, (col, pair) in enumerate(zip(df.columns, paired)):
-        plt.subplot(df.shape[1], 1, i+1)
-        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
-        plt.title(col)
-        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
-        plt.ylabel('Mutation fraction')
-        plt.tight_layout()
-    plt.tight_layout()
-    return df
 
 def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
@@ -226,7 +246,6 @@ def change_in_dms_conc(study, samples, construct):
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
     # get a neat dataframe with the mutation rates for each base at each deltaG
-    study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
     data = study.get_df(sample=sample, family=family, section='ROI')
     
     data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else x)
@@ -285,3 +304,69 @@ def heatmap_across_family_members(study, sample, family):
     plt.title('Heatmap across family members with all bases - sample {} - family {}'.format(sample, family))
     plt.ylabel('Construct')
 
+
+
+# ---------------------------------------------------------------------------
+
+# utils
+# ---------------------------------------------------------------------------
+
+def __correlation_scatter_plot(x,y):
+        # reshape plot
+        plt.axis('square')
+        (xmin, xmax), (ymin, ymax) = plt.xlim(), plt.ylim()
+        plt.xlim(min(xmin, ymin), max(xmax, ymax))
+        xmin, xmax = plt.xlim()
+        
+        # plot y=x line
+        plt.plot([xmin, xmax], [xmin, xmax], 'k--', label='y=x')
+
+        # plot regression line
+        x, y = np.array(x), np.array(y)
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+        
+        # compute R2
+        r2 =  r2_score(y, x)
+        
+        plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='LR: {:.2f}x + {:.2f}'.format(slope, intercept))
+        
+        # plot labels
+        plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+        plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+        plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
+    # get data
+    data = study.get_df(
+        sample = samples,
+        construct=construct,
+        section='ROI',
+        base_type = ['A','C']) 
+
+    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
+    
+    if len(data) == 0:
+        print('No data: {}, {}'.format(samples, construct))
+        return None
+    
+    # turn it into a dataframe
+    df = pd.DataFrame(
+        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
+        data = np.array(data['mut_rates'].tolist()),
+        index= data[attr].values
+    )
+    
+    # plot
+    paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
+    
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Construct: {}'.format(construct))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
+    return df

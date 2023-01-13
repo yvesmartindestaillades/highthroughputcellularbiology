@@ -3,6 +3,7 @@ import sys, os
 import json
 import pandas as pd
 import matplotlib
+
 sys.path.append('../../')
 
 version = 'v0.1'
@@ -26,6 +27,15 @@ boundary = {
     'barcode': lambda s: [139, 151],
     'full': lambda s: [0, len(s)],
 }
+
+bio_replicates_samples = [
+ ['01_1_S22_reads','01_02_S23_reads'],
+ ['05_1_S24_reads','05_2_S25_reads'],
+ ['1_1_S26new_reads','1_2_S27new_reads'],
+ #'5_2_S31_reads',
+ ['10_1_s32new_reads','10_2_s33new_reads']
+ ] # TODO
+
 sys.path.append('/Users/ymdt/src/dreem')
 import dreem
 
