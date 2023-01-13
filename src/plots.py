@@ -120,29 +120,95 @@ def distribution_of_the_mean(means, residues_set, bounds):
 SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES = ['MS2','TC1','ROI','TC2','LAH','buffer']
 
 def barcode_comparison_scatter_plot(study, sample, construct, replicate):
-    plt.figure(figsize=(5,6))
+    """ generate plots for comparing barcode replicates
     
-    # plot scatter plot
-    X, Y = [], []
-    for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
-        x = study.get_df(sample = sample, construct = construct, section = section, base_type = ['A','C'])['mut_rates'].iloc[0]
-        y = study.get_df(sample = sample, construct = replicate, section = section, base_type = ['A','C'])['mut_rates'].iloc[0]
-        plt.plot(x, y, 'x', label = section)
-        X, Y = X + list(x), Y + list(y)
+    A scatter plot is generated for each section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES
+    A line is drawn for the mean of the replicates
+    A button is added to the plot to select other constructs and other replicates in study.df
+    
+    """
+    x = study.get_df(
+        sample = sample, 
+        construct = construct, 
+        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES, 
+        base_type = ['A','C'])
+    
+    x = x[['sample','construct','section','mut_rates']]
+    
+    y = study.get_df(
+        sample = sample, 
+        construct = replicate,
+        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES,
+        base_type = ['A','C'])
+    
+    y = y[['sample','construct','section','mut_rates']]
 
-    __correlation_scatter_plot(X,Y)
-    plt.title('Barcodes comparison - {}'.format(sample))
-    plt.xlabel('Barcode: %s' % construct)
-    plt.ylabel('Barcode: %s' % replicate)
+    data = {
+        construct: x,
+        replicate: y
+    }
+
+    fig = go.Figure()
+    for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
+        fig.add_trace(go.Scatter(
+            x = x[x['section']==section]['mut_rates'].values[0].tolist(),
+            y = y[y['section']==section]['mut_rates'].values[0].tolist(),
+            mode = 'markers',
+            name = section
+        ))
+    
+    for trace in __corr_scatter_plot(data):
+        fig.add_trace(trace)
+    
+    fig.layout.update(
+        title = 'Barcode comparison - {} '.format(sample),
+        xaxis_title = 'Barcode: {}'.format(construct),
+        yaxis_title = 'Barcode: {}'.format(replicate),
+        showlegend = True
+    )
+    
+    return {'fig': fig, 'data': data}
+    
+def combined_barcode_replicates_in_sample(study):
+    
+    data = {}
+    for sample in study.df['sample'].unique():
+        replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
+        data[sample] = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
+    
+    fig = go.Figure()
+
+    # Add trace for each sample and show only one sample at a time
+    for sample in data.keys():
+        fig.add_trace(go.Box(
+            y = data[sample],
+            name = sample,
+            visible = False
+        ))
+    
+    fig.layout.update(
+        title = 'Combined barcodes replicates - {}'.format(sample),
+        xaxis_title = 'Constructs',
+        yaxis_title = 'Pearson correlation score average across barcode replicates'
+    )
+    
+    # add a button to show/hide each sample
+    fig.layout.updatemenus = [
+        go.layout.Updatemenu(
+            active = 1,
+            buttons = [
+                dict(
+                    label = sample,
+                    method = 'update',
+                    args = [{'visible': [False] * len(data.keys())},
+                            {'title': 'Combined barcodes replicates - {}'.format(sample)}]
+                ) for sample in data.keys()
+            ]
+        )
+    ]
     
     
-def combined_barcode_replicates_in_sample(study, sample):
-    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
-    pearson_scores = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
-    plt.bar(np.arange(len(pearson_scores)), pearson_scores)
-    plt.ylabel('Pearson correlation score average across barcode replicates')
-    plt.xlabel('Constructs (barcode vs all replicates)')
-    plt.title('Combined barcodes replicates - {}'.format(sample))
+    return {'fig': fig, 'data': data}
 
 # ---------------------------------------------------------------------------
 
@@ -374,3 +440,61 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
         plt.tight_layout()
     plt.tight_layout()
     return df
+
+def __corr_scatter_plot(data):
+    x, y = data.values()
+    x = np.concatenate(x['mut_rates'].values)
+    y = np.concatenate(y['mut_rates'].values)
+    
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+    r2 =  r2_score(y, x)
+    
+    traces = []
+    # add the regression line
+    traces.append(
+        go.Scatter(
+            x = x,
+            y = intercept + slope * x,
+            mode = 'lines',
+            name = 'LR: {:.2f}x + {:.2f}'.format(slope, intercept),
+            line = dict(
+                color = ('rgb(205, 12, 24)'),
+                width = 2,
+            )
+        )
+    )
+    # Plot x = y
+    traces.append(
+        go.Scatter(
+            x = x,
+            y = x,
+            mode = 'lines',
+            name = 'x=y',
+            line = dict(
+                color = ('rgb(0, 0, 0)'),
+                width = 2,
+            )
+        )
+    )
+    
+    # add the pearson correlation score as a text
+    traces.append(
+        go.Scatter(
+            x = [np.mean(x)],
+            y = [np.max(y)],
+            mode = 'text',
+            text = ['Pearson correlation score: {:.2f}'.format(r_value)],
+            textposition = 'top center'
+        ))
+    
+    # add the R2 score as a text
+    traces.append(
+        go.Scatter(
+            x = [np.mean(x)],
+            y = [np.max(y)],
+            mode = 'text',
+            text = ['R2 score: {:.2f}'.format(r2)],
+            textposition = 'bottom center'
+        ))
+    
+    return traces

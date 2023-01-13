@@ -7,7 +7,7 @@ import matplotlib
 sys.path.append('../../')
 
 version = 'v0.1'
-generate_plots = True
+generate_plots = False
 if generate_plots:
     matplotlib.use('agg')
 
