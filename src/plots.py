@@ -11,8 +11,9 @@ import generate_dataset
 import seaborn as sns
 # pearsonr = scipy.stats.pearsonr
 import scipy.stats
-
+from sklearn.metrics import r2_score
 import plotly.graph_objects as go
+import plotly.express as px
 
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
@@ -126,48 +127,95 @@ def distribution_of_the_mean(means, residues_set, bounds):
 SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES = ['MS2','TC1','ROI','TC2','LAH','buffer']
 
 def barcode_comparison_scatter_plot(study, sample, construct, replicate):
-    plt.figure(figsize=(5,6))
+    """ generate plots for comparing barcode replicates
     
-    # plot scatter plot
-    X, Y = [], []
-    for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
-        x = study.get_df(sample = sample, construct = construct, section = section, base_type = ['A','C'])['mut_rates'].iloc[0]
-        y = study.get_df(sample = sample, construct = replicate, section = section, base_type = ['A','C'])['mut_rates'].iloc[0]
-        plt.plot(x, y, 'x', label = section)
-        X, Y = X + list(x), Y + list(y)
-        
-    # reshape plot
-    plt.axis('square')
-    (xmin, xmax), (ymin, ymax) = plt.xlim(), plt.ylim()
-    plt.xlim(min(xmin, ymin), max(xmax, ymax))
-    xmin, xmax = plt.xlim()
+    A scatter plot is generated for each section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES
+    A line is drawn for the mean of the replicates
+    A button is added to the plot to select other constructs and other replicates in study.df
     
-    # plot y=x line
-    plt.plot([xmin, xmax], [xmin, xmax], 'k--', label='y=x')
+    """
+    x = study.get_df(
+        sample = sample, 
+        construct = construct, 
+        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES, 
+        base_type = ['A','C'])
+    
+    x = x[['sample','construct','section','mut_rates']]
+    
+    y = study.get_df(
+        sample = sample, 
+        construct = replicate,
+        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES,
+        base_type = ['A','C'])
+    
+    y = y[['sample','construct','section','mut_rates']]
 
-    # plot regression line
-    x, y = np.array(X), np.array(Y)
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
-    # compute R2
-    r2 = r_value**2
-    plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='Linear regression')
+    data = {
+        construct: x,
+        replicate: y
+    }
+
+    fig = go.Figure()
+    for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
+        fig.add_trace(go.Scatter(
+            x = x[x['section']==section]['mut_rates'].values[0].tolist(),
+            y = y[y['section']==section]['mut_rates'].values[0].tolist(),
+            mode = 'markers',
+            name = section
+        ))
     
-    # plot labels
-    plt.title('Barcodes comparison - {}'.format(sample))
-    plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.xlabel('Barcode: %s' % construct)
-    plt.ylabel('Barcode: %s' % replicate)
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    for trace in __corr_scatter_plot(data):
+        fig.add_trace(trace)
+    
+    fig.layout.update(
+        title = 'Barcode comparison - {} '.format(sample),
+        xaxis_title = 'Barcode: {}'.format(construct),
+        yaxis_title = 'Barcode: {}'.format(replicate),
+        showlegend = True
+    )
+    
+    return {'fig': fig, 'data': data}
+    
+def combined_barcode_replicates_in_sample(study):
+    
+    data = {}
+    for sample in study.df['sample'].unique():
+        replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
+        data[sample] = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
+    
+    fig = go.Figure()
+
+    # Add trace for each sample and show only one sample at a time
+    for sample in data.keys():
+        fig.add_trace(go.Box(
+            y = data[sample],
+            name = sample,
+            visible = False
+        ))
+    
+    fig.layout.update(
+        title = 'Combined barcodes replicates - {}'.format(sample),
+        xaxis_title = 'Constructs',
+        yaxis_title = 'Pearson correlation score average across barcode replicates'
+    )
+    
+    # add a button to show/hide each sample
+    fig.layout.updatemenus = [
+        go.layout.Updatemenu(
+            active = 1,
+            buttons = [
+                dict(
+                    label = sample,
+                    method = 'update',
+                    args = [{'visible': [False] * len(data.keys())},
+                            {'title': 'Combined barcodes replicates - {}'.format(sample)}]
+                ) for sample in data.keys()
+            ]
+        )
+    ]
     
     
-def combined_barcode_replicates_in_sample(study, sample):
-    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
-    pearson_scores = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
-    plt.bar(np.arange(len(pearson_scores)), pearson_scores)
-    plt.ylabel('Pearson correlation score average across barcode replicates')
-    plt.xlabel('Constructs (barcode vs all replicates)')
-    plt.title('Combined barcodes replicates - {}'.format(sample))
+    return {'fig': fig, 'data': data}
 
 # ---------------------------------------------------------------------------
 
@@ -181,45 +229,87 @@ def barcode_replicates(study, sample):
     plt.ylabel('Number of constructs')
     plt.title('Barcodes replicates - {}'.format(sample))
     
+def barcode_replicates_per_construct(study, samples, construct):
+    data = study.get_df(
+        sample= samples,
+        construct = construct,
+        base_type = ['A','C'],
+        section='full'
+        )
+    
+    if not len(data) == 2:
+        return data
+    
+    plt.figure()
+    
+    plt.plot(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1], 'x')
+    
+    __correlation_scatter_plot(
+        x = data['mut_rates'].iloc[0],
+        y = data['mut_rates'].iloc[1]
+        )
+    
+    plt.title('Biological replicates - {} '.format(construct))
+    plt.xlabel(data['sample'].iloc[0])
+    plt.ylabel(data['sample'].iloc[1])
+    
+    
+def sample_replicates_heatmap_per_family(study, samples, family, section):
+    if section in ['LAH','MS2']:
+        
+        data = study.get_df(
+            sample=samples, 
+            section=section, 
+            family=family, 
+            base_type=['A','C'])
+        
+    if section == 'ROI':
+
+        data = study.get_df(
+            sample=samples, 
+            section=section, 
+            family=family)
+        
+    data = data[['sample','construct','mut_rates','frame_shift_ROI','sequence']]
+    
+    if section == 'ROI':
+        reference = data[data['sample'] == samples[0]].iloc[0]['sequence']
+        data['mut_rates'] = data.apply(lambda row: int(row['frame_shift_ROI'])*[np.nan] + list(row['mut_rates']) + (len(reference) - int(row['frame_shift_ROI']) - len(row['mut_rates']))*[np.nan], axis=1)
+
+    data_sample_0 = data[data['sample'] == samples[0]].reset_index(drop=True)
+    data_sample_1 = data[data['sample'] == samples[1]].reset_index(drop=True)
+
+    df = pd.DataFrame(
+        index = data_sample_0['construct'],
+        columns = data_sample_1['construct'], 
+    )
+        
+    for _, row in data_sample_0.iterrows():
+        for _, row2 in data_sample_1.iterrows():
+            df.loc[row['construct'], row2['construct']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
+                                
+    fig = px.imshow(
+                df, 
+                x=df.columns, 
+                y=df.index, 
+                color_continuous_scale='RdBu_r', 
+                zmin=-1, 
+                zmax=1, 
+                title='Pearson between samples {} and {} (family {})'.format(samples[0], samples[1], family),
+                labels=dict(x='Sample {}'.format(samples[1]), y='Sample {}'.format(samples[0])),
+                width=800,
+                height=800,
+                text_auto = '.2f'
+                )
+    fig.show() 
+    
+    return {'data': data, 'fig': fig}
+        
 # ---------------------------------------------------------------------------
 
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
-def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
-    # get data
-    data = study.get_df(
-        sample = samples,
-        construct=construct,
-        section='ROI',
-        base_type = ['A','C']) 
 
-    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
-    
-    if len(data) == 0:
-        print('No data: {}, {}'.format(samples, construct))
-        return None
-    
-    # turn it into a dataframe
-    df = pd.DataFrame(
-        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = np.array(data['mut_rates'].tolist()),
-        index= data[attr].values
-    )
-    
-    # plot
-    paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
-    
-    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
-    plt.suptitle('Construct: {}'.format(construct))
-    for i, (col, pair) in enumerate(zip(df.columns, paired)):
-        plt.subplot(df.shape[1], 1, i+1)
-        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
-        plt.title(col)
-        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
-        plt.ylabel('Mutation fraction')
-        plt.tight_layout()
-    plt.tight_layout()
-    return df
 
 def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
@@ -233,7 +323,6 @@ def change_in_dms_conc(study, samples, construct):
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
     # get a neat dataframe with the mutation rates for each base at each deltaG
-    study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
     data = study.get_df(sample=sample, family=family, section='ROI')
     
     data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else x)
@@ -292,3 +381,127 @@ def heatmap_across_family_members(study, sample, family):
     plt.title('Heatmap across family members with all bases - sample {} - family {}'.format(sample, family))
     plt.ylabel('Construct')
 
+
+
+# ---------------------------------------------------------------------------
+
+# utils
+# ---------------------------------------------------------------------------
+
+def __correlation_scatter_plot(x,y):
+        # reshape plot
+        plt.axis('square')
+        (xmin, xmax), (ymin, ymax) = plt.xlim(), plt.ylim()
+        plt.xlim(min(xmin, ymin), max(xmax, ymax))
+        xmin, xmax = plt.xlim()
+        
+        # plot y=x line
+        plt.plot([xmin, xmax], [xmin, xmax], 'k--', label='y=x')
+
+        # plot regression line
+        x, y = np.array(x), np.array(y)
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+        
+        # compute R2
+        r2 =  r2_score(y, x)
+        
+        plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='LR: {:.2f}x + {:.2f}'.format(slope, intercept))
+        
+        # plot labels
+        plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+        plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
+        plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
+    # get data
+    data = study.get_df(
+        sample = samples,
+        construct=construct,
+        section='ROI',
+        base_type = ['A','C']) 
+
+    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
+    
+    if len(data) == 0:
+        print('No data: {}, {}'.format(samples, construct))
+        return None
+    
+    # turn it into a dataframe
+    df = pd.DataFrame(
+        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
+        data = np.array(data['mut_rates'].tolist()),
+        index= data[attr].values
+    )
+    
+    # plot
+    paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
+    
+    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
+    plt.suptitle('Construct: {}'.format(construct))
+    for i, (col, pair) in enumerate(zip(df.columns, paired)):
+        plt.subplot(df.shape[1], 1, i+1)
+        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
+        plt.title(col)
+        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
+        plt.ylabel('Mutation fraction')
+        plt.tight_layout()
+    plt.tight_layout()
+    return df
+
+def __corr_scatter_plot(data):
+    x, y = data.values()
+    x = np.concatenate(x['mut_rates'].values)
+    y = np.concatenate(y['mut_rates'].values)
+    
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+    r2 =  r2_score(y, x)
+    
+    traces = []
+    # add the regression line
+    traces.append(
+        go.Scatter(
+            x = x,
+            y = intercept + slope * x,
+            mode = 'lines',
+            name = 'LR: {:.2f}x + {:.2f}'.format(slope, intercept),
+            line = dict(
+                color = ('rgb(205, 12, 24)'),
+                width = 2,
+            )
+        )
+    )
+    # Plot x = y
+    traces.append(
+        go.Scatter(
+            x = x,
+            y = x,
+            mode = 'lines',
+            name = 'x=y',
+            line = dict(
+                color = ('rgb(0, 0, 0)'),
+                width = 2,
+            )
+        )
+    )
+    
+    # add the pearson correlation score as a text
+    traces.append(
+        go.Scatter(
+            x = [np.mean(x)],
+            y = [np.max(y)],
+            mode = 'text',
+            text = ['Pearson correlation score: {:.2f}'.format(r_value)],
+            textposition = 'top center'
+        ))
+    
+    # add the R2 score as a text
+    traces.append(
+        go.Scatter(
+            x = [np.mean(x)],
+            y = [np.max(y)],
+            mode = 'text',
+            text = ['R2 score: {:.2f}'.format(r2)],
+            textposition = 'bottom center'
+        ))
+    
+    return traces
