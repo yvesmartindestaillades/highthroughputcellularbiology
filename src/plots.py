@@ -52,10 +52,7 @@ def mutations_per_read(study, sample):
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
 def mutation_identity_at_each_position(study, sample, construct):
-    try:
-        data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
-    except:
-        print(sample, construct)
+    data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -65,38 +62,36 @@ def mutation_identity_at_each_position(study, sample, construct):
 
     return {'fig': stacked_bar, 'data': df}
 
-    # df.plot.bar(stacked=True, figsize= (20,4), color={'A':'r','C':'b','G':'y','T':'g'})
-    
-    # plt.xticks(rotation=0)
-    # plt.xlabel('')
-    # plt.ylabel('Mutation fraction')
-    # plt.xlabel('Position')
-    # plt.title('Mutation identity at each position - {} - {}'.format(sample, construct))
-    
+ 
 def mutation_fraction_at_each_position(study, sample, construct):
     data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
+    stacked_bar = []
+    color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
     for base in ['A','C','G','T']:
         df[base] = [mr if b==base  else np.nan for mr, b in zip(data['mut_rates'], data['sequence'])]
-    df.plot.bar(stacked=True, figsize= (20,4), color={'A':'r','C':'b','G':'y','T':'g'})
-    plt.xticks(rotation=0)
-    plt.ylabel('Mutation fraction')
-    plt.xlabel('Position')
-    plt.title('Mutation fraction at each position - {} - {}'.format(sample, construct))
+        stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
+    
+    return {'fig': stacked_bar, 'data': df}
 
 def read_coverage_per_position(study, sample, construct):
     data = study.get_df(sample=sample, construct=construct)
     sections, section_start, section_end = data['section'].unique(), data['section_start'].unique(), data['section_end'].unique()
     idx = np.argsort(section_start)
     sections, section_start, section_end = sections[idx], section_start[idx], section_end[idx]
-    fig = plt.figure()
-    ax = plt.gca()
+
+    scatters = []
     for s, ss, se in zip(sections, section_start, section_end):
-        ax.plot(np.arange(ss-1, se), data[data['section']==s]['cov_bases'].values[0], label=s)
-    plt.legend()
-    plt.xlabel('Position')
-    plt.ylabel('Read coverage')
-    plt.title('Read coverage per position - {} - {}'.format(sample, construct))
+
+        scatters.append(
+            go.Scatter(
+                x=np.arange(ss-1, se),
+                y=data[data['section']==s]['cov_bases'].values[0],
+                name=s, 
+                mode='lines',
+                showlegend=False) )
+    data['section'] = sections
+    return {'fig': scatters, 'data': data}
     
 # ---------------------------------------------------------------------------
 
