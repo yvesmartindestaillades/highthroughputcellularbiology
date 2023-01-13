@@ -39,6 +39,7 @@ if not os.path.exists(saved_feather):
     study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
     study.df.to_feather(saved_feather)
 else:
+    
     study = dreem.draw.study.Study()
     study.df = pd.read_feather(saved_feather)
 

@@ -23,26 +23,19 @@ def mutations_in_barcodes(study, sample):
         all_mutations += list(read)
 
     hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
-
-
-    graph = go.Bar( x=bin_edges, y=hist, name='Mutations in barcodes - {}'.format(sample), showlegend=False, marker_color='indianred')
-    return graph
+    return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
-    plt.hist(num_aligned_reads, bins=np.arange(500,max(num_aligned_reads), 1000), rwidth=0.9)
-    plt.xlabel('Number of reads (binned)')
-    plt.ylabel('Number of constructs')
-    plt.title('Number of aligned reads per construct freq. distrib. - {}'.format(sample))
+
+    return go.Histogram(x=num_aligned_reads, showlegend=False, marker_color='indianred')
 
 def num_aligned_reads_per_construct(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
     num_aligned_reads.sort()
     num_aligned_reads.reverse()
-    plt.bar(np.arange(1,1+len(num_aligned_reads)), num_aligned_reads)
-    plt.xlabel('Number of constructs')
-    plt.ylabel('Number of reads')
-    plt.title('Number of aligned reads per construct - {}'.format(sample))
+
+    return go.Bar(x=np.arange(1,1+len(num_aligned_reads)), y=num_aligned_reads, showlegend=False, marker_color='indianred')
     
 # ---------------------------------------------------------------------------
 
