@@ -63,7 +63,7 @@ def mutation_identity_at_each_position(study, sample, construct):
         df[base] = np.array(data['mod_bases_'+base])/np.array(data['info_bases'])
         stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
 
-    return stacked_bar
+    return {'fig': stacked_bar, 'data': df}
 
     # df.plot.bar(stacked=True, figsize= (20,4), color={'A':'r','C':'b','G':'y','T':'g'})
     
