@@ -17,7 +17,13 @@ def generate_barcode_replicates_pairs(study, sample):
 
 def compute_pearson_scores(study, sample, replicates_lists, sections):
     scores = []
-    data = study.get_df(sample=sample, section = sections, base_type=['A','C'])[['construct','mut_rates']]
+    data = study.get_df(sample=sample, section = sections, base_type=['A','C'])[['sequence','construct','mut_rates']]
+
+    # make sure that each construct has the same number of sections
+    for c, g in data.groupby('construct'):
+        if len(g) != len(sections) and c in replicates_lists:
+            replicates_lists.pop(c)
+    
     df = data.groupby('construct').agg({'mut_rates': lambda x: x}).reset_index()
     df['mut_rates'] = df['mut_rates'].apply(lambda x:np.concatenate(x))
     
@@ -25,6 +31,8 @@ def compute_pearson_scores(study, sample, replicates_lists, sections):
         scores_construct = []
         x = df[df['construct'] == construct]['mut_rates'].iloc[0]
         for replicate in replicates:
+            if replicate not in replicates_lists.keys():
+                continue
             y = df[df['construct'] == replicate]['mut_rates'].iloc[0]
             scores_construct.append(custom_pearsonr(x, y))
         scores.append(np.mean(scores_construct))

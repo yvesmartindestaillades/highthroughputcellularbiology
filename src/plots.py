@@ -221,20 +221,65 @@ def combined_barcode_replicates_in_sample(study):
         )
     ]
     
-    
     return {'fig': fig, 'data': data}
 
 # ---------------------------------------------------------------------------
 
 ## c / iv - Reproducibility
 # ---------------------------------------------------------------------------
-def barcode_replicates(study, sample):
-    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)   
-    pearson_scores = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
-    plt.hist(pearson_scores, rwidth=0.9)
-    plt.xlabel('Pearson correlation score average across barcode replicates')
-    plt.ylabel('Number of constructs')
-    plt.title('Barcodes replicates - {}'.format(sample))
+def barcode_replicates(study):
+    
+    data = {}
+    samples = study.df['sample'].unique()
+    samples.sort()
+    
+    for sample in samples:    
+        replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)   
+        data[sample] = generate_dataset.compute_pearson_scores(study, sample, replicates_lists, SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES)
+    
+    fig = go.Figure()
+    
+    # plot a trace per sample and show only one sample at a time
+    for sample in data.keys():
+        fig.add_trace(go.Histogram(
+            x = data[sample],
+            name = sample,
+            visible = False
+        ))
+    # set the first sample to be visible
+    fig.data[0].visible = True
+    
+    fig.layout.update(
+        title = 'Barcodes replicates - {}'.format(sample),
+        xaxis_title = 'Constructs',
+        yaxis_title = 'Pearson correlation score average across barcode replicates'
+    )
+    
+    # add a button to show/hide each sample
+    # the button should be on the right of the plot, outside of the plot
+    
+    fig.layout.updatemenus = [
+        go.layout.Updatemenu(
+            active = 0,
+            buttons = [
+                dict(
+                    args = [{'visible': [True if i==j else False for i in range(len(data.keys()))]}],
+                    label = sample,
+                    method = 'update'
+                ) for j, sample in enumerate(data.keys())
+            ],
+            direction = 'down',
+            pad = {'r': 10, 't': 10},
+            showactive = True,
+            x = 0.7,
+            xanchor = 'left',
+            y = 1.1,
+            yanchor = 'top'
+        )
+    ]
+    
+    return {'fig': fig, 'data': data}
+
     
 def barcode_replicates_per_construct(study, samples, construct):
     data = study.get_df(
