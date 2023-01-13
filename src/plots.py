@@ -246,6 +246,7 @@ def barcode_replicates(study):
             name = sample,
             visible = False
         ))
+        
     # set the first sample to be visible
     fig.data[0].visible = True
     
@@ -364,13 +365,13 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
 
 
 def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
-    __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
+    return __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
     
 def change_in_reaction_time(study, samples, construct):
-    __mut_frac_vs_sample_attr(study, samples, construct, 'inc_time_tot_secs', 'DMS incubation time (s)')
+    return __mut_frac_vs_sample_attr(study, samples, construct, 'inc_time_tot_secs', 'DMS incubation time (s)')
 
 def change_in_dms_conc(study, samples, construct):
-    __mut_frac_vs_sample_attr(study, samples, construct, 'DMS_conc_mM', 'DMS concentration (mM)')
+    return __mut_frac_vs_sample_attr(study, samples, construct, 'DMS_conc_mM', 'DMS concentration (mM)')
 
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
@@ -393,17 +394,57 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
     # differentiate between paired and unpaired bases
     paired = [residue for idx, residue in enumerate([False if residue == '.' else True for residue in data['structure'].iloc[0]]) if idx_AC[idx]]
     
-    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
-    plt.suptitle('Sample: {}, Family: {}'.format(sample, family))
-    for i, (col, pair) in enumerate(zip(df.columns, paired)):
-        plt.subplot(df.shape[1], 1, i+1)
-        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
-        plt.title(col)
-        plt.xlabel('Predicted free energy (kcal/mol)')
-        plt.ylabel('Mutation fraction')
-        plt.tight_layout()
-    plt.tight_layout()
-    return df
+    fig = go.Figure()
+    
+    for col, pair in zip(df.columns, paired):
+        fig.add_trace(go.Scatter(
+            x = df.index,
+            y = df[col],
+            mode = 'markers',
+            name = col,
+            visible = 'legendonly',
+            marker=dict(
+                size=20,
+                line=dict(
+                    color='black',
+                    width=0 if pair else 3
+                )
+            ),
+    ))
+        
+    fig.update_layout(
+        title = 'Mutation rate across family members for sample {} (family {})'.format(sample, family),
+        xaxis_title = 'Predicted free energy (kcal/mol)',
+        yaxis_title = 'Mutation rate',
+    )
+    
+    fig.update_layout(dict(updatemenus=[
+                        dict(
+                            type = "buttons",
+                            direction = "left",
+                            buttons=list([
+                                dict(
+                                    args=["visible", "legendonly"],
+                                    label="Deselect All",
+                                    method="restyle"
+                                ),
+                                dict(
+                                    args=["visible", True],
+                                    label="Select All",
+                                    method="restyle"
+                                )
+                            ]),
+                            pad={"r": 10, "t": 10},
+                            showactive=False,
+                            x=1,
+                            xanchor="right",
+                            y=1.1,
+                            yanchor="top"
+                        ),
+                    ]
+              ))
+
+    return {'data': data, 'fig': fig}
     
 # ---------------------------------------------------------------------------
 
@@ -476,7 +517,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     
     if len(data) == 0:
         print('No data: {}, {}'.format(samples, construct))
-        return None
+        return {'data': [], 'fig': go.Figure()}
     
     # turn it into a dataframe
     df = pd.DataFrame(
@@ -488,17 +529,31 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     # plot
     paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
     
-    plt.subplots(nrows=df.shape[1], figsize=(4,20), sharex=True, sharey=True)
-    plt.suptitle('Construct: {}'.format(construct))
-    for i, (col, pair) in enumerate(zip(df.columns, paired)):
-        plt.subplot(df.shape[1], 1, i+1)
-        plt.scatter(df[col].index, df[col].values, facecolors='r' if pair else 'none', edgecolors='r')
-        plt.title(col)
-        plt.xlabel(x_label) if x_label else plt.xlabel(attr)
-        plt.ylabel('Mutation fraction')
-        plt.tight_layout()
-    plt.tight_layout()
-    return df
+    fig = go.Figure()
+    
+    for col, pair in zip(df.columns, paired):
+        fig.add_trace(go.Scatter(
+            x = df.index,
+            y = df[col],
+            mode = 'markers',
+            name = col,
+            visible = 'legendonly',
+            marker=dict(
+                size=20,
+                line=dict(
+                    color='black',
+                    width=0 if pair else 3
+                )
+            ),
+    ))
+        
+    fig.update_layout(
+        title='Construct: {}'.format(construct),
+        xaxis_title=x_label if x_label else attr,
+        yaxis_title='Mutation fraction')
+
+    
+    return {'data': df, 'fig': fig}
 
 def __corr_scatter_plot(data):
     x, y = data.values()

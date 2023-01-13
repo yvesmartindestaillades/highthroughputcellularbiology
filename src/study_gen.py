@@ -14,4 +14,5 @@ else:
     study.df = pd.read_feather(saved_feather)
 
 study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
+study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
 
