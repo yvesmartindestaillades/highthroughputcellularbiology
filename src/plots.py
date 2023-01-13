@@ -163,6 +163,7 @@ def barcode_replicates_per_construct(study, samples, construct):
         base_type = ['A','C'],
         section='full'
         )
+    
     if not len(data) == 2:
         return data
     
@@ -214,19 +215,22 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
         for _, row2 in data_sample_1.iterrows():
             df.loc[row['construct'], row2['construct']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
                                 
-    return px.imshow(
+    fig = px.imshow(
                 df, 
                 x=df.columns, 
                 y=df.index, 
                 color_continuous_scale='RdBu_r', 
                 zmin=-1, 
                 zmax=1, 
-                title='Pearson correlation between samples {} and {} (family {})'.format(samples[0], samples[1], family),
+                title='Pearson between samples {} and {} (family {})'.format(samples[0], samples[1], family),
                 labels=dict(x='Sample {}'.format(samples[1]), y='Sample {}'.format(samples[0])),
                 width=800,
                 height=800,
                 text_auto = '.2f'
-                ).show() 
+                )
+    fig.show() 
+    
+    return {'data': data, 'fig': fig}
         
 # ---------------------------------------------------------------------------
 

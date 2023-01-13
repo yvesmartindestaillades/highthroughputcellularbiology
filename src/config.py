@@ -7,7 +7,7 @@ import matplotlib
 sys.path.append('../../')
 
 version = 'v0.1'
-generate_plots = False
+generate_plots = True
 if generate_plots:
     matplotlib.use('agg')
 
@@ -32,10 +32,36 @@ bio_replicates_samples = [
  ['01_1_S22_reads','01_02_S23_reads'],
  ['05_1_S24_reads','05_2_S25_reads'],
  ['1_1_S26new_reads','1_2_S27new_reads'],
- #'5_2_S31_reads',
+ ['2_1_s28new_reads','2_2_S29new_reads'],
+ ['5_2_S31_reads','5_1_S30new_reads'],
  ['10_1_s32new_reads','10_2_s33new_reads']
- ] # TODO
+ ] 
 
+reaction_time_samples = [
+    'Lauren_603_1min',
+    'Lauren_603_3min',
+    'Lauren_603_5min',
+    'Lauren_603_10min',
+]
+
+dms_concentration_samples = [
+ '01_1_S22_reads',
+ '01_02_S23_reads',
+ '05_1_S24_reads',
+ '05_2_S25_reads'
+ '1_1_S26new_reads',
+ '1_2_S27new_reads',
+ '2_1_s28new_reads',
+ '2_2_S29new_reads',
+ '5_1_S30new_reads'
+ '5_2_S31_reads',
+ '10_1_s32new_reads',
+ '10_2_s33new_reads',
+ ]
+    
+temperature_samples = [] # TODO
+
+    
 sys.path.append('/Users/ymdt/src/dreem')
 import dreem
 
