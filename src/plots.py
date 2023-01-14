@@ -14,6 +14,7 @@ import scipy.stats
 from sklearn.metrics import r2_score
 import plotly.graph_objects as go
 import plotly.express as px
+import copy 
 
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
@@ -81,14 +82,16 @@ def read_coverage_per_position(study, sample, construct):
     sections, section_start, section_end = sections[idx], section_start[idx], section_end[idx]
 
     scatters = []
-    for s, ss, se in zip(sections, section_start, section_end):
-
+    for i, (s, ss, se) in enumerate(zip(sections, section_start, section_end)):
+        y_data = copy.copy(data[data['section']==s]['cov_bases'].values[0])
+        if s=='full':
+            y_data[min(section_start[1:]-1):max(section_end[1:])] = 0.0
         scatters.append(
-            go.Scatter(
+            go.Bar(
                 x=np.arange(ss-1, se),
-                y=data[data['section']==s]['cov_bases'].values[0],
+                y=y_data,
                 name=s, 
-                mode='lines',
+                marker_color=px.colors.qualitative.Plotly[i],
                 showlegend=False) )
     data['section'] = sections
     return {'fig': scatters, 'data': data}
