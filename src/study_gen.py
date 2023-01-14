@@ -7,12 +7,14 @@ if not os.path.exists(saved_feather):
         data = [json.load(open(path_data + f, 'r')) for f in os.listdir(path_data) if f.endswith('.json')]
     )
     study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
-    study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
+    study.df= generate_dataset.find_frame_shift_ROI(study)
     study.df.to_feather(saved_feather)
 else:
     study = dreem.draw.study.Study()
     study.df = pd.read_feather(saved_feather)
 
 study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
-study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
+# only keep the constructs that have 8 sections 
+study.df = study.df[study.df['construct'].isin(study.df.groupby(['sample','construct']).filter(lambda x: len(x) == 8)['construct'])].reset_index(drop=True)
+study.df = generate_dataset.find_frame_shift_ROI(study)
 

@@ -1,6 +1,7 @@
 import scipy.stats
 import numpy as np
 from util import findall, custom_pearsonr
+import pandas as pd
 
 def generate_barcode_replicates_pairs(study, sample):
     data = study.get_df(sample=sample, section = 'ROI')[['sequence', 'construct']]
@@ -41,8 +42,13 @@ def compute_pearson_scores(study, sample, replicates_lists, sections):
 
 
 def find_frame_shift_ROI(study):
-    df = study.get_df(section = 'ROI')
-    for _, g in df.groupby('family'):
+    
+    if 'frame_shift_ROI' in study.df.columns:
+        study.df.drop('frame_shift_ROI', axis=1, inplace=True)
+            
+    df = study.df[(study.df['section'] == 'ROI')][['sample','sequence', 'construct', 'family','section']].reset_index(drop=True)
+
+    for _, g in df.groupby(['sample','family']):
         g.sort_values('sequence', key=lambda x: x.str.len(), inplace=True, ascending=False)
         reference = g['sequence'].iloc[0]
         for idx, row in g.iterrows():
@@ -51,5 +57,10 @@ def find_frame_shift_ROI(study):
             most_likely_match = [-abs(len(reference)/2 - (m+len(row['sequence'])/2)) for m in subsequence_matches]
             assert len(most_likely_match) > 0, 'Sequence {} not found in reference {}'.format(row['sequence'], reference)
             df.loc[idx, 'frame_shift_ROI'] = subsequence_matches[most_likely_match.index(max(most_likely_match))]
-            
-    return df['frame_shift_ROI'].astype(int)
+
+    for _, g in df.groupby('family'):
+        g.sort_values('sequence', key=lambda x: x.str.len(), inplace=True, ascending=False)
+        assert g['frame_shift_ROI'].iloc[0] == 0, 'Frame shift is not 0 for reference sequence'
+
+    df = study.df.merge(df[['sample','construct','section','sequence','frame_shift_ROI']], on=['sample','construct','section','sequence'], how='left')
+    return df

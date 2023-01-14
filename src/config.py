@@ -6,7 +6,7 @@ import matplotlib
 
 sys.path.append('../../')
 
-version = 'v0.1'
+version = 'v0.2'
 generate_plots = False
 if generate_plots:
     matplotlib.use('agg')
@@ -70,17 +70,3 @@ import dreem
 path_data = '../../data/'
 saved_feather = path_data+'df.feather'
 
-if not os.path.exists(saved_feather):
-    study = dreem.draw.study.Study(
-        data = [json.load(open(path_data + f, 'r')) for f in os.listdir(path_data) if f.endswith('.json')]
-    )
-    study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
-    study.df.to_feather(saved_feather)
-else:
-    study = dreem.draw.study.Study()
-    study.df = pd.read_feather(saved_feather)
-
-study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage]
-# only keep the constructs that have all sections
-
-study.df = study.df.groupby(['sample', 'construct']).filter(lambda x: len(x) == 8)

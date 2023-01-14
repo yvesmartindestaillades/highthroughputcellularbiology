@@ -111,19 +111,13 @@ def bitvector_to_df(path, *args, **kwargs):
     df = df.applymap(lambda x: values_map[x])
     return df
 
-def findall(sub, string):
-    """
-    >>> text = "Allowed Hello Hollow"
-    >>> tuple(findall('ll', text))
-    (1, 10, 16)
-    """
-    index = 0 - len(sub)
-    try:
-        while True:
-            index = string.index(sub, index + len(sub))
-            yield index
-    except ValueError:
-        pass
+def findall(p, s):
+    '''Yields all the positions of
+    the pattern p in the string s.'''
+    i = s.find(p)
+    while i != -1:
+        yield i
+        i = s.find(p, i+1)
 
 def custom_pearsonr(x, y, percentile=90, diff_filter=0.2):
     x, y = np.array(x), np.array(y)

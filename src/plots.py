@@ -454,29 +454,101 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
 ## d / kfold
 # ---------------------------------------------------------------------------
 
-def heatmap_across_family_members(study, sample, family):
-    study.df['frame_shift_ROI'] = generate_dataset.find_frame_shift_ROI(study)
-    data = study.get_df(
-        sample=sample,
-        family=family,
-        section = 'ROI',
+def heatmap_across_family_members(study, sample):
+    
+    fig = go.Figure()
+    
+    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')]
+    
+    # add each family as a plot but show only one at the time
+    for family in big_data['family'].unique():
+        
+        data = big_data[(big_data['family'] == family)]
+        
+        data_all_samples = study.df[(study.df['family'] == family) & (study.df['section'] == 'ROI')]
+        sequences_ROI = data_all_samples.sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values
+        reference = sequences_ROI[0]
+        
+        df = pd.DataFrame(
+            columns = [base + str(idx + 1) for base, idx in zip(reference, range(len(reference)))],
+            data = [int(offset)*[np.nan] + list(mr) + [np.nan]*(len(reference)-int(offset)-len(mr)) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+            index = data['construct'].values 
+        ).sort_index(ascending=False)
+        
+        
+        fig.add_trace(go.Heatmap(
+            z = df.values,
+            x = df.columns,
+            y = df.index,
+            name = 'Family {}'.format(family),
+            visible = False,
+            colorscale = 'Viridis',
+            colorbar = dict(
+                title = 'Mutation fraction',
+                titleside = 'right',
+                tickmode = 'array',
+                tickvals = [0, 0.02, 0.04, 0.06, 0.08],
+                ticktext = ['0', '0.02', '0.04', '0.06', '0.08'],
+            ),
+            showscale = True,
+            zmin = 0,
+            zmax = 0.08,
+            hovertemplate = 'Construct: %{y}<br>Base: %{x}<br>Mutation fraction: %{z:.2f}<extra></extra>',
+        ))
+    
+        
+        # place the xticks on top of the plot
+        fig.update_xaxes(side="top")
+        
+            
+        
+     #   fig.update_xaxes(ticklabelposition="inside top")
+        
+        # make the background white
+        fig.update_layout(
+            plot_bgcolor='white',
+            paper_bgcolor='white',
         )
-    
-    sequences_ROI = data[data['section'] == 'ROI'].sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values
-    reference = sequences_ROI[0]
+   
+    # add a button to select a single family to display
 
-    df = pd.DataFrame(
-        columns = [base + str(idx + 1) for base, idx in zip(reference, range(len(reference)))],
-        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
-        index = data['construct'].values 
-    )
+    # show the first plot
+        # set the first sample to be visible
+    fig.data[0].visible = True
     
+    # add a button to show/hide each sample
+    # the button should be on the right of the plot, outside of the plot
+    
+    fig.layout.updatemenus = [
+        go.layout.Updatemenu(
+            active = 0,
+            buttons = [
+                dict(
+                    args = [{'visible': [True if i==j else False for i in range(len(big_data['family'].unique()))]}],
+                    label = sample,
+                    method = 'update'
+                ) for j, sample in enumerate(big_data['family'].unique())
+            ],
+            direction = 'down',
+            pad = {'r': 10, 't': 10},
+            showactive = True,
+            x = 1,
+            xanchor = 'left',
+            y = 1.2,
+            yanchor = 'top'
+        )
+    ]
+        
+    fig.layout.title = 'Mutation rate across family members with all bases - sample {}'.format(sample)
+    
+    return {'data': big_data, 'fig': fig}
+    """
     plt.figure(figsize=(data.shape[1]//2, data.shape[0]//2))
     plt.gca().xaxis.tick_top()
     sns.heatmap(df, annot=True, fmt='.2f')
     plt.title('Heatmap across family members with all bases - sample {} - family {}'.format(sample, family))
     plt.ylabel('Construct')
-
+    """
 
 
 # ---------------------------------------------------------------------------
