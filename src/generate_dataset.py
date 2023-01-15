@@ -37,8 +37,10 @@ def compute_pearson_scores(study, sample, replicates_lists, sections):
             y = df[df['construct'] == replicate]['mut_rates'].iloc[0]
             scores_construct.append(custom_pearsonr(x, y))
         scores.append(np.mean(scores_construct))
-    scores.sort(reverse=True)
-    return scores
+
+    sorted_idx = np.argsort(scores)[::-1]
+    # return dict with construct names and scores as two sorted lists
+    return {'constructs': [list(replicates_lists.keys())[i] for i in sorted_idx], 'scores': [scores[i] for i in sorted_idx]}
 
 
 def find_frame_shift_ROI(study):

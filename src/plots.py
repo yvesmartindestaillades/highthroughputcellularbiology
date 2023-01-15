@@ -188,9 +188,14 @@ def combined_barcode_replicates_in_sample(study):
     # Add trace for each sample and show only one sample at a time
     for sample in data.keys():
         fig.add_trace(go.Bar(
-            y = data[sample],
+            y = data[sample]['scores'],
             name = sample,
-            visible = False
+            visible = False,
+            # add hover info to display the construct names from the list data[sample]['constructs']
+            hovertemplate='<b>Construct</b>: %{text}<br><b>Score</b>: %{y:.2f}<extra></extra>',
+            text = data[sample]['constructs'],
+            # remove the text in the bar
+            textposition = 'none'
         ))
         
     # set the first sample to be visible
