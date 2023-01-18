@@ -3,9 +3,10 @@ import numpy as np
 from tqdm import tqdm
 from util import *
 from config import *
+from rnastructure import *
 
 # Load df and add family and flank
-df = fasta_to_df('../data/reference.fasta')
+df = fasta_to_df('data/reference.fasta')
 df['family'] = df['construct'].apply(lambda s: s.split('_')[1].split('-')[0].split('=')[1])
 df['flank'] = df['construct'].apply(lambda s: s.split('-')[2].split('=')[0])
         
@@ -27,4 +28,16 @@ for f in boundary.keys():
 # drop sequence, reset index, save to csv
 df = df_out.reset_index(drop=True)
 
-df.to_csv('../data/library.csv', index=False)
+rna = RNAstructure('/Users/ymdt/src/RNAstructure/exe')
+temp = df['sequence']
+df['sequence'] = df.apply(lambda x: x['sequence'][x['section_start']-1:x['section_end']], axis=1)
+
+for sequence, g in tqdm(df.groupby('sequence')):
+    rna.fit(sequence=sequence)
+    deltaG, structure = rna.predict_construct_deltaG()
+    df.loc[g.index, 'deltaG'] = deltaG
+    df.loc[g.index, 'structure'] = structure
+    
+df['sequence'] = temp
+
+df.to_csv('data/library.csv', index=False)
