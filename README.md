@@ -45,6 +45,7 @@ You should get the following:
 ├── figs
 ├── notebooks
 ├── src
+├── (venv)
 ├── requirements.txt
 ├── LICENSE
 ├── Makefile
