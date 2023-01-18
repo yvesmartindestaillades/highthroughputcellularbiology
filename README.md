@@ -89,6 +89,8 @@ plot = plots.barcode_comparison_scatter_plot(study, sample)
 ### How to get the list of samples, families, constructs, sections etc
 The list of samples, families, and constructs are stored in the handbook `notebooks/misc/handbook.ipynb`. Just print the corresponding cell to get the list.
 
+### How to extract the data from the dataframe
+DREEM's object `study` provides a filtering function called `get_df`. This function returns a dataframe with the filtered data. Check `notebooks/misc/handbook.ipynb`. for more details.
 
 ### How to extract the data from a figure
 1. Run the corresponding cell.
