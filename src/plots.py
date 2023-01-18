@@ -250,7 +250,7 @@ def barcode_replicates(study):
     # plot a trace per sample and show only one sample at a time
     for sample in data.keys():
         fig.add_trace(go.Histogram(
-            x = data[sample],
+            x = data[sample]['scores'],
             name = sample,
             visible = False
         ))
@@ -290,29 +290,93 @@ def barcode_replicates(study):
     return {'fig': fig, 'data': data}
 
     
-def barcode_replicates_per_construct(study, samples, construct):
-    data = study.get_df(
-        sample= samples,
-        construct = construct,
-        base_type = ['A','C'],
-        section='full'
+def barcode_replicates_per_construct(study, samples, family):
+        
+    fig = go.Figure()
+
+    unique_constructs = study.get_df(sample=samples, family=family)['construct'].unique()
+    
+    # For each construct plot three traces: the correlation line, the y=x line and the scatter plot
+    for i_c, construct in enumerate(unique_constructs):
+
+        data = study.get_df(
+            sample= samples,
+            construct = construct,
+            base_type = ['A','C'],
+            section='full'
+            )
+        
+        if not len(data) == 2:
+            return {'fig': fig, 'data': data}
+        
+        # Plot the scatter plot of the two replicates
+        fig.add_trace(
+            go.Scatter(x=data['mut_rates'].iloc[0], y=data['mut_rates'].iloc[1], 
+            mode='markers', marker=dict(color='blue'),
+            showlegend=False, visible=False
+            ))
+        
+        # Plot the correlation line and y=x line
+        __correlation_scatter_plot(
+            x = data['mut_rates'].iloc[0],
+            y = data['mut_rates'].iloc[1],
+            fig=fig
+            )
+
+    # Show the three traces for the first construct
+    for i in range(3):
+        fig.data[i].visible = True
+
+    # add a button to show/hide the traces for each construct
+    # the button should be on the right of the plot, outside of the plot
+    fig.layout.updatemenus = [
+        go.layout.Updatemenu(
+            active = 0,
+            buttons = [
+                dict(
+                    args = [{'visible': [True if i==j or i==j+1 or i==j+2 else False for i in range(len(fig.data))]}],
+                    label = construct,
+                    method = 'update'
+                ) for j, construct in enumerate(unique_constructs)
+            ],
+            direction = 'down',
+            pad = {'r': 10, 't': 10},
+            showactive = True,
+            x = 0.7,
+            xanchor = 'left',
+            y = 1.1,
+            yanchor = 'top'
         )
-    
-    if not len(data) == 2:
-        return data
-    
-    plt.figure()
-    
-    plt.plot(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1], 'x')
-    
-    __correlation_scatter_plot(
-        x = data['mut_rates'].iloc[0],
-        y = data['mut_rates'].iloc[1]
-        )
-    
-    plt.title('Biological replicates - {} '.format(construct))
-    plt.xlabel(data['sample'].iloc[0])
-    plt.ylabel(data['sample'].iloc[1])
+    ]
+
+    # Set the titles and aspect ratio to 1
+    fig.layout.update(
+        title = 'Biological replicates - {}'.format(family),
+        xaxis_title = data['sample'].iloc[0],
+        yaxis_title = data['sample'].iloc[1],
+        xaxis = dict(scaleanchor = "y", scaleratio = 1),
+        yaxis = dict(scaleanchor = "x", scaleratio = 1),
+        height = 700
+    )
+
+    # Add Pearson correlation and r2 as annotation
+    fig.add_annotation(
+        x=0.5,
+        y=0.9,
+        xref="paper",
+        yref="paper",
+        text="Pearson correlation: {:.2f} <br> R2: {:.2f}".format(
+                    custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1]), 
+                    r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])),
+        showarrow=False,
+        font=dict(
+            family="Courier New, monospace",
+            size=16,
+            color="black"
+        ))
+
+    return {'fig': fig, 'data': data}
+
     
     
 def sample_replicates_heatmap_per_family(study, samples, family, section):
@@ -561,15 +625,16 @@ def heatmap_across_family_members(study, sample):
 # utils
 # ---------------------------------------------------------------------------
 
-def __correlation_scatter_plot(x,y):
+def __correlation_scatter_plot(x, y, fig):
         # reshape plot
-        plt.axis('square')
-        (xmin, xmax), (ymin, ymax) = plt.xlim(), plt.ylim()
-        plt.xlim(min(xmin, ymin), max(xmax, ymax))
-        xmin, xmax = plt.xlim()
-        
-        # plot y=x line
-        plt.plot([xmin, xmax], [xmin, xmax], 'k--', label='y=x')
+        (xmin, xmax) = min(x), max(x)
+        (ymin, ymax) = min(y), max(y)
+
+
+        # Plot a straight line y=x
+        fig.add_trace(
+            go.Scatter(x=[xmin, xmax], y=[xmin, xmax], mode='lines', name='y=x', line=dict(color='black', dash='dash'),
+            showlegend=True, visible=False))
 
         # plot regression line
         x, y = np.array(x), np.array(y)
@@ -578,12 +643,13 @@ def __correlation_scatter_plot(x,y):
         # compute R2
         r2 =  r2_score(y, x)
         
-        plt.plot([xmin, xmax], [xmin*slope + intercept, xmax*slope + intercept], 'r-', label='LR: {:.2f}x + {:.2f}'.format(slope, intercept))
+        # Plot regression line
+        fig.add_trace(
+            go.Scatter(x=[xmin, xmax], y=[xmin*slope + intercept, xmax*slope + intercept],
+            mode='lines', name='LR: {:.2f}x + {:.2f}'.format(slope, intercept), line=dict(color='red'), 
+            showlegend=True, visible=False))
+
         
-        # plot labels
-        plt.text(0.5, 0.9, 'Pearson correlation: {:.2f}'.format(custom_pearsonr(x,y)), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-        plt.text(0.5, 0.85, 'R2: {:.2f}'.format(r2), horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-        plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
 def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     # get data
