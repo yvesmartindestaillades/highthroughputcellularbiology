@@ -1,8 +1,8 @@
 # High-Throughput Cellular Biology
 
 ### Requirements
-- python 3.11
-- requirements.txt
+- `python 3.11`
+- `requirements.txt`
 
 ### Installation
 
