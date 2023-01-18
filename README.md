@@ -1,5 +1,6 @@
 # High-Throughput Cellular Biology
 
+## Getting Started
 ### Requirements
 - `python 3.11`
 - `requirements.txt`
@@ -52,10 +53,46 @@ You should get the following:
 └── README.md
 ```
 
-The series of notebooks in the folder `notebooks` shows the plots for Lauren Halger's paper: «high-throughput cellular biology».
+## Usage
 
-The plotting functions and the data procesing methods are stored in the `src` folder.
+### Notebook organization
 
-The data is stored in the folder `data`.
+Each notebook is a self-contained script that can be run independently. The notebooks are organized in the following order:
 
-Figures generated in the google colab are automatically outputted in the folder `figs`.
+**Computational Pipeline**
+1. Demultiplexing: `i_demultiplexing.ipynb`, keys values and plots about the demultiplexing. 
+2. DMS-MaPseq: `ii_DMSMaPseq.ipynb`, mutations per read, base coverage, population average.
+3. Error estimation: `iv_error_estimation.ipynb`, messy thoughts about the error estimation.
+
+** Results**
+1. Barcodes: `iii_barcodes.ipynb`, study of barcode mutations and barcode replicates.
+2. Reproducibility: `iv_reproducibility.ipynb`, barcode replicates and biological replicates.
+3. Signal is proportional to fraction folded: `v_proportional.ipynb`, mutation rates vs DMS concentration, temperature, and free energy.
+
+** K-fold **
+1. K-fold: `kfold.ipynb`, mutation rates heatmap, confidence interval on the k-fold estimation.
+
+### How to run the notebooks
+1. Open the notebook in your favorite editor (e.g. VSCode, PyCharm, Jupyter Notebook, etc.)
+2. Run the first cell to import the libraries and the functions
+3. Some plots maybe require some inputs, e.g a sample, a construct, etc. Just change the value as you need it.
+
+Ex: 
+
+```
+## Edit sample and family here ##
+sample = '01_02_S23_reads'   
+family = 'hp1'    
+#################################   
+
+```
+### How to get the list of samples, families, constructs, sections etc
+The list of samples, families, and constructs are stored in the handbook `notebooks/handbook.ipynb`. Just print the corresponding cell to get the list.
+
+
+### How to extract the data from a figure
+1. Run the corresponding cell.
+2. The data is stored in the variable `plot['data']`.
+
+### How to download the figures
+Figures generated in the google colab are automatically outputted in the folder `figs`, and in the subfolder corresponding to the notebook.
