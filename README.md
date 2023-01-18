@@ -87,12 +87,18 @@ sample = '01_02_S23_reads'
 plot = plots.barcode_comparison_scatter_plot(study, sample)
 ```
 ### How to get the list of samples, families, constructs, sections etc
-The list of samples, families, and constructs are stored in the handbook `notebooks/handbook.ipynb`. Just print the corresponding cell to get the list.
+The list of samples, families, and constructs are stored in the handbook `notebooks/misc/handbook.ipynb`. Just print the corresponding cell to get the list.
 
 
 ### How to extract the data from a figure
 1. Run the corresponding cell.
 2. The data is stored in the variable `plot['data']`.
+3. You can save the data in a csv file using the following code:
+
+```
+import pandas as pd
+pd.DataFrame(plot['data']).to_csv('data.csv', index=False)
+```
 
 ### How to download the figures
 Figures generated in the google colab are automatically outputted in the folder `figs`, and in the subfolder corresponding to the notebook.
