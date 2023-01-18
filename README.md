@@ -64,27 +64,27 @@ Each notebook is a self-contained script that can be run independently. The note
 2. DMS-MaPseq: `ii_DMSMaPseq.ipynb`, mutations per read, base coverage, population average.
 3. Error estimation: `iv_error_estimation.ipynb`, messy thoughts about the error estimation.
 
-** Results**
+**Results**
 1. Barcodes: `iii_barcodes.ipynb`, study of barcode mutations and barcode replicates.
 2. Reproducibility: `iv_reproducibility.ipynb`, barcode replicates and biological replicates.
 3. Signal is proportional to fraction folded: `v_proportional.ipynb`, mutation rates vs DMS concentration, temperature, and free energy.
 
-** K-fold **
+**K-fold**
 1. K-fold: `kfold.ipynb`, mutation rates heatmap, confidence interval on the k-fold estimation.
 
 ### How to run the notebooks
 1. Open the notebook in your favorite editor (e.g. VSCode, PyCharm, Jupyter Notebook, etc.)
 2. Run the first cell to import the libraries and the functions
-3. Some plots maybe require some inputs, e.g a sample, a construct, etc. Just change the value as you need it.
+3. Some plots maybe require some inputs, e.g a sample, a construct, etc. Just change the value as you need.
 
 Ex: 
 
 ```
-## Edit sample and family here ##
+###### Change sample ######
 sample = '01_02_S23_reads'   
-family = 'hp1'    
-#################################   
+###########################    
 
+plot = plots.barcode_comparison_scatter_plot(study, sample)
 ```
 ### How to get the list of samples, families, constructs, sections etc
 The list of samples, families, and constructs are stored in the handbook `notebooks/handbook.ipynb`. Just print the corresponding cell to get the list.
