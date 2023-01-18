@@ -23,14 +23,10 @@ def mutations_in_barcodes(study):
     fig = go.Figure()
 
     data = study.df[study.df['section'] == 'barcode']
-    bins = np.arange(0, max(np.concatenate(data['num_of_mutations'].values.flatten()))+1, 1)
 
     for sample in data['sample'].unique():
-        
-        hist, bin_edges = np.histogram(
-                                np.concatenate(data[data['sample']==sample]['num_of_mutations'].values.flatten()),
-                                bins=bins
-                                )
+        hist = np.sum(np.stack(data[data['sample']==sample]['num_of_mutations'].values), axis=0)
+        bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
         
         fig.add_trace(
             go.Bar(
@@ -38,6 +34,7 @@ def mutations_in_barcodes(study):
                 y=hist,
                 name=sample,
                 visible=False,
+                hovertemplate='Number of mutations: %{x}<br>Number of reads: %{y}<extra></extra>',
                 ))
         
     fig.data[0].visible = True
@@ -64,12 +61,12 @@ def mutations_in_barcodes(study):
     return {'fig': fig, 'data': data[['sample','construct','num_of_mutations']]}
 
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
-    num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
+    num_aligned_reads = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_aligned'].to_list()
 
     return go.Histogram(x=num_aligned_reads, showlegend=False, marker_color='indianred')
 
 def num_aligned_reads_per_construct(study, sample):
-    num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
+    num_aligned_reads = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_aligned'].to_list()
     num_aligned_reads.sort()
     num_aligned_reads.reverse()
 
@@ -80,16 +77,13 @@ def num_aligned_reads_per_construct(study, sample):
 ## b / ii - DMS-MaPseq
 # ---------------------------------------------------------------------------
 def mutations_per_read(study, sample):
-    bc_reads = study.get_df(sample=sample, section='full')['num_of_mutations'].reset_index(drop=True)
-    all_mutations = []
-    for read in bc_reads:
-        all_mutations += list(read)
-
-    hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
+    data = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+    hist = np.sum(np.stack(data.values), axis=0)
+    bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
 def mutation_identity_at_each_position(study, sample, construct):
-    data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')].iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -101,7 +95,7 @@ def mutation_identity_at_each_position(study, sample, construct):
 
  
 def mutation_fraction_at_each_position(study, sample, construct):
-    data = study.get_df(sample=sample, construct=construct, section='full').iloc[0]
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')].iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -112,7 +106,7 @@ def mutation_fraction_at_each_position(study, sample, construct):
     return {'fig': stacked_bar, 'data': df}
 
 def read_coverage_per_position(study, sample, construct):
-    data = study.get_df(sample=sample, construct=construct)
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct)]
     sections, section_start, section_end = data['section'].unique(), data['section_start'].unique(), data['section_end'].unique()
     idx = np.argsort(section_start)
     sections, section_start, section_end = sections[idx], section_start[idx], section_end[idx]
@@ -160,7 +154,7 @@ def distribution_of_the_mean(means, residues_set, bounds):
 # ---------------------------------------------------------------------------
 SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES = ['MS2','TC1','ROI','TC2','LAH','buffer']
 
-def barcode_comparison_scatter_plot(study, sample, construct, replicate):
+def barcode_comparison_scatter_plot(study, sample):
     """ generate plots for comparing barcode replicates
     
     A scatter plot is generated for each section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES
@@ -168,45 +162,87 @@ def barcode_comparison_scatter_plot(study, sample, construct, replicate):
     A button is added to the plot to select other constructs and other replicates in study.df
     
     """
-    x = study.get_df(
-        sample = sample, 
-        construct = construct, 
-        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES, 
-        base_type = ['A','C'])
     
-    x = x[['sample','construct','section','mut_rates']]
-    
-    y = study.get_df(
-        sample = sample, 
-        construct = replicate,
-        section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES,
-        base_type = ['A','C'])
-    
-    y = y[['sample','construct','section','mut_rates']]
-
-    data = {
-        construct: x,
-        replicate: y
-    }
-
     fig = go.Figure()
-    for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
-        fig.add_trace(go.Scatter(
-            x = x[x['section']==section]['mut_rates'].values[0].tolist(),
-            y = y[y['section']==section]['mut_rates'].values[0].tolist(),
-            mode = 'markers',
-            name = section
-        ))
     
-    for trace in __corr_scatter_plot(data):
-        fig.add_trace(trace)
+    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
     
-    fig.layout.update(
-        title = 'Barcode comparison - {} '.format(sample),
-        xaxis_title = 'Barcode: {}'.format(construct),
-        yaxis_title = 'Barcode: {}'.format(replicate),
-        showlegend = True
+    data = study.get_df(
+            sample = sample, 
+            section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES, 
+            base_type = ['A','C'])[['sample','construct','section','mut_rates']]
+    
+    showed_pairs = []
+    uniquepairs = []
+    for construct, replicates in replicates_lists.items():
+        for replicate in replicates:
+            if not (replicate, construct) in showed_pairs:
+                
+                uniquepairs.append((construct, replicate))
+                x = data[data['construct']==construct]
+                y = data[data['construct']==replicate]
+
+                df = {
+                    construct: x,
+                    replicate: y
+                }
+
+                for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
+                    fig.add_trace(go.Scatter(
+                        x = x[x['section']==section]['mut_rates'].values[0].tolist(),
+                        y = y[y['section']==section]['mut_rates'].values[0].tolist(),
+                        mode = 'markers',
+                        name = section,#' '.join([construct, replicate]),
+                        visible=False,
+                    ))
+                    showed_pairs.append((construct, replicate))
+                
+                for trace in __corr_scatter_plot(df):
+                    fig.add_trace(trace)
+                    showed_pairs.append((construct, replicate))
+                
+                fig.layout.update(
+                    title = 'Barcode comparison - {} '.format(sample),
+                    xaxis_title = 'Barcode: {}'.format(construct),
+                    yaxis_title = 'Barcode: {}'.format(replicate),
+                    showlegend = True,
+                )
+
+                
+    # Add dropdown menu to select construct and replicate
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                active=len(uniquepairs)-1,
+                buttons=list([
+                    dict(label = ' vs '.join([constructs[0], constructs[1]]),
+                            method = 'update',
+                            args = [{
+                                'visible': [True if constructs == c else False for c in showed_pairs]},
+                                {'title': 'Barcode comparison - {} - {} vs {}'.format(sample, constructs[0], constructs[1]),
+                                'xaxis':
+                                    {'title': 'Barcode: {}'.format(constructs[0])},
+                                'yaxis':
+                                    {'title': 'Barcode: {}'.format(constructs[1])},
+                                }], 
+                            )
+                    for constructs in uniquepairs
+                ]),
+            
+            direction = 'down',
+            pad = {'r': 10, 't': 10},
+            showactive = True,
+            x = 1,
+            xanchor = 'right',
+            y = 1,
+            yanchor = 'bottom'
+            )],
     )
+    
+    # activate the first trace
+    for i in range(10):
+        fig.data[i].visible = True
+        
     
     return {'fig': fig, 'data': data}
     
@@ -471,7 +507,6 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
 
-
 def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
     return __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
     
@@ -686,7 +721,6 @@ def __correlation_scatter_plot(x, y, fig):
             showlegend=True, visible=False))
 
         
-
 def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     # get data
     data = study.get_df(
