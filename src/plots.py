@@ -18,14 +18,50 @@ import copy
 
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
-def mutations_in_barcodes(study, sample):
-    bc_reads = study.get_df(sample=sample, section='barcode')['num_of_mutations'].reset_index(drop=True).values
-    all_mutations = []
-    for read in bc_reads:
-        all_mutations += list(read)
+def mutations_in_barcodes(study):
+    
+    fig = go.Figure()
 
-    hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
-    return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
+    data = study.df[study.df['section'] == 'barcode']
+    bins = np.arange(0, max(np.concatenate(data['num_of_mutations'].values.flatten()))+1, 1)
+
+    for sample in data['sample'].unique():
+        
+        hist, bin_edges = np.histogram(
+                                np.concatenate(data[data['sample']==sample]['num_of_mutations'].values.flatten()),
+                                bins=bins
+                                )
+        
+        fig.add_trace(
+            go.Bar(
+                x=bin_edges[:-1],
+                y=hist,
+                name=sample,
+                visible=False,
+                ))
+        
+    fig.data[0].visible = True
+    
+    fig.update_layout(barmode='stack', title='Number of mutations in barcodes - {}'.format(data['sample'].unique()[0]))
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                active=0,
+                buttons=list([
+                    dict(label = sample,
+                            method = "update",
+                            args = [{"visible": [sample == s for s in data['sample'].unique()]},
+                                    {"title": 'Number of mutations in barcodes - {}'.format(sample)}])
+                    for sample in data['sample'].unique()
+                ]), 
+                x = 0.7,
+                xanchor = 'left',
+                y = 1.1,
+                yanchor = 'top'
+                )
+            ])
+    
+    return {'fig': fig, 'data': data[['sample','construct','num_of_mutations']]}
 
 def num_aligned_reads_per_construct_frequency_distribution(study, sample):
     num_aligned_reads = study.get_df(sample=sample, section='full')['num_aligned'].to_list()
