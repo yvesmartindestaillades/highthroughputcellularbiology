@@ -46,6 +46,8 @@ You should get the following:
 ├── notebooks
 ├── src
 ├── requirements.txt
+├── LICENSE
+├── Makefile
 └── README.md
 ```
 
