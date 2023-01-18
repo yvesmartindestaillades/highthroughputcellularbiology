@@ -23,14 +23,10 @@ def mutations_in_barcodes(study):
     fig = go.Figure()
 
     data = study.df[study.df['section'] == 'barcode']
-    bins = np.arange(0, max(np.concatenate(data['num_of_mutations'].values.flatten()))+1, 1)
 
     for sample in data['sample'].unique():
-        
-        hist, bin_edges = np.histogram(
-                                np.concatenate(data[data['sample']==sample]['num_of_mutations'].values.flatten()),
-                                bins=bins
-                                )
+        hist = np.sum(np.stack(data[data['sample']==sample]['num_of_mutations'].values), axis=0)
+        bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
         
         fig.add_trace(
             go.Bar(
@@ -38,6 +34,7 @@ def mutations_in_barcodes(study):
                 y=hist,
                 name=sample,
                 visible=False,
+                hovertemplate='Number of mutations: %{x}<br>Number of reads: %{y}<extra></extra>',
                 ))
         
     fig.data[0].visible = True
@@ -80,12 +77,9 @@ def num_aligned_reads_per_construct(study, sample):
 ## b / ii - DMS-MaPseq
 # ---------------------------------------------------------------------------
 def mutations_per_read(study, sample):
-    bc_reads = study.get_df(sample=sample, section='full')['num_of_mutations'].reset_index(drop=True)
-    all_mutations = []
-    for read in bc_reads:
-        all_mutations += list(read)
-
-    hist, bin_edges = np.histogram(all_mutations, bins=np.arange(0, max(all_mutations)) )
+    data = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+    hist = np.sum(np.stack(data.values), axis=0)
+    bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
 def mutation_identity_at_each_position(study, sample, construct):
