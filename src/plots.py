@@ -16,6 +16,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import copy 
 
+from scipy.optimize import curve_fit
+
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
 def mutations_in_barcodes(study):
@@ -546,6 +548,7 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
             mode = 'markers',
             name = col,
             visible = 'legendonly',
+            legendgroup=col,
             marker=dict(
                 size=20,
                 line=dict(
@@ -554,6 +557,46 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
                 )
             ),
     ))
+
+    # Function to fit
+    def sigmoid(x, a, b, c):
+        RT = 1.987204258*310/1000
+        return a / (1 + b*np.exp(-x/RT)) + c
+
+    # For each column of df, fit a sigmoid, and plot it with the confidance interval
+    colors = px.colors.qualitative.Plotly + px.colors.qualitative.D3 + px.colors.qualitative.G10 + px.colors.qualitative.T10
+    for i_b, (base, mut_rate) in enumerate(df.iteritems()):
+        dG = df.index[~np.isnan(mut_rate)].values
+        mut_rate = mut_rate[~np.isnan(mut_rate)].values
+
+        if len(mut_rate) >= 3:
+            popt, pcov = curve_fit(sigmoid, dG, mut_rate, p0=[0.04, 0.02, 0.00], bounds=([0, 0, 0], [0.1, np.inf, 0.05]), max_nfev=1000)
+
+            xdata_MC = np.linspace(min(dG), max(dG), 100)
+            y_fit = sigmoid(xdata_MC, *popt)
+
+            # Do a Monte Carlo simulation to estimate the uncertainty in the fit parameters using a multinormal distribution
+            # with the covariance matrix as the covariance matrix
+            N = 1000
+            param_samples = np.clip(np.random.multivariate_normal(popt, pcov, N).T.reshape(3, N, 1), 0, np.inf)
+
+            # Compute the sigmoid for each set of parameters for each x value
+            y_MC = sigmoid(xdata_MC.reshape(1, -1) , param_samples[0], param_samples[1], param_samples[2])
+
+            fig.add_trace(go.Scatter(x=xdata_MC, y=y_fit, mode='lines', name='fit',
+                                    visible = 'legendonly', legendgroup=base, showlegend=False, 
+                                    marker_color=colors[i_b]))
+
+            fig.add_trace(go.Scatter(x=np.concatenate((xdata_MC, xdata_MC[::-1])), # x, then x reversed
+                                    y=np.concatenate((np.percentile(y_MC, 97.5, axis=0), np.percentile(y_MC, 2.5, axis=0)[::-1])), # upper, then lower reversed
+                                    fill='toself',
+                                    fillcolor=colors[i_b],
+                                    line=dict(color=colors[i_b]),
+                                    opacity=0.1,
+                                    hoverinfo="skip",
+                                    visible = 'legendonly', legendgroup=base, showlegend=False
+                                ))
+
         
     fig.update_layout(
         title = 'Mutation rate across family members for sample {} (family {})'.format(sample, family),
