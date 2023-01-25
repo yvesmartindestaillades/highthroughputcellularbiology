@@ -361,6 +361,8 @@ def barcode_replicates(study):
         )
     ]
     
+    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1')
+    
     return {'fig': fig, 'data': data}
 
     

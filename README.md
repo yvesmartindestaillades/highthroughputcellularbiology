@@ -5,6 +5,10 @@
 - `python 3.11`
 - `requirements.txt`
 
+**If using a Mac**
+
+- `command line developer tools`
+
 ### Installation
 
 **Using pyenv**
