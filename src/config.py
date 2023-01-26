@@ -29,8 +29,8 @@ boundary = {
 }
 
 bio_replicates_samples = [
-['lauren470_S1','18_DMS'],
-['lauren472_S3','19_DMS'],
+['lauren470_S1','18_DMS_S7_L001'],
+['lauren472_S3','19_DMS_S9_L001'],
 ['01_1_S22_reads','01_02_S23_reads'],
 ['05_1_S24_reads','05_2_S25_reads'],
 ['1_1_S26new_reads','1_2_S27new_reads'],

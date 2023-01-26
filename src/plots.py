@@ -117,7 +117,7 @@ def read_coverage_per_position(study, sample, construct):
     for i, (s, ss, se) in enumerate(zip(sections, section_start, section_end)):
         y_data = copy.copy(data[data['section']==s]['cov_bases'].values[0])
         if s=='full':
-            y_data[min(section_start[1:]-1):max(section_end[1:])] = 0.0
+            y_data[min(section_start[1:]-1):max(section_end[1:])] = np.zeros(max(section_end[1:])-min(section_start[1:])+1)
         scatters.append(
             go.Bar(
                 x=np.arange(ss-1, se),
@@ -168,6 +168,7 @@ def barcode_comparison_scatter_plot(study, sample):
     fig = go.Figure()
     
     replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
+    assert len(replicates_lists) > 0, 'No barcode replicates found for sample {}'.format(sample)
     
     data = study.get_df(
             sample = sample, 
@@ -196,6 +197,7 @@ def barcode_comparison_scatter_plot(study, sample):
                         mode = 'markers',
                         name = section,#' '.join([construct, replicate]),
                         visible=False,
+                            
                     ))
                     showed_pairs.append((construct, replicate))
                 
@@ -241,10 +243,19 @@ def barcode_comparison_scatter_plot(study, sample):
             )],
     )
     
+    # the x and y axis have the same scale
+    fig.update_xaxes(scaleanchor = "y")
+    fig.update_yaxes(scaleanchor = "x")
+    
+
     # activate the first trace
     for i in range(10):
         fig.data[i].visible = True
         
+    data = study.get_df(
+            sample = sample, 
+            section = 'full', 
+            base_type = ['A','C'])[['sample','construct','mut_rates']]
     
     return {'fig': fig, 'data': data}
     
@@ -303,6 +314,8 @@ def combined_barcode_replicates_in_sample(study):
         )
     ]
     
+    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1')
+
     return {'fig': fig, 'data': data}
 
 # ---------------------------------------------------------------------------
@@ -361,36 +374,50 @@ def barcode_replicates(study):
         )
     ]
     
-    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1')
-    
+    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1').rename(columns={'constructs':'construct', 'scores':'score'})
+
     return {'fig': fig, 'data': data}
 
     
-def barcode_replicates_per_construct(study, samples, family):
+def bio_replicates_per_construct(study, samples, family):
         
     fig = go.Figure()
 
     unique_constructs = study.get_df(sample=samples, family=family)['construct'].unique()
+
+    big_data = study.get_df(
+        sample= samples,
+        construct = unique_constructs,
+        base_type = ['A','C'],
+        section='full'
+        )[['sample','construct', 'mut_rates']]
+    
+    for construct in unique_constructs:
+        # add pearson correlation and r2 in big_data columns
+        data = big_data.loc[big_data['construct'] == construct]
+        if len(data) == 2:
+            big_data.loc[big_data['construct'] == construct, 'pearson'] = custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
+            big_data.loc[big_data['construct'] == construct, 'r2'] = r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
+    
+    assert len(unique_constructs) > 0, 'No constructs found for the given samples and family'
     
     # For each construct plot three traces: the correlation line, the y=x line and the scatter plot
     for i_c, construct in enumerate(unique_constructs):
 
-        data = study.get_df(
-            sample= samples,
-            construct = construct,
-            base_type = ['A','C'],
-            section='full'
-            )
+        data = big_data.loc[big_data['construct'] == construct]
         
         if not len(data) == 2:
-            return {'fig': fig, 'data': data}
+            continue
         
         # Plot the scatter plot of the two replicates
         fig.add_trace(
             go.Scatter(x=data['mut_rates'].iloc[0], y=data['mut_rates'].iloc[1], 
             mode='markers', marker=dict(color='blue'),
-            showlegend=False, visible=False
+            showlegend=False, visible=False,
             ))
+        
+            # Add Pearson correlation and r2 as annotation
+
         
         # Plot the correlation line and y=x line
         __correlation_scatter_plot(
@@ -399,6 +426,7 @@ def barcode_replicates_per_construct(study, samples, family):
             fig=fig
             )
 
+    assert len(fig.data) > 0, 'No pairs found for the given samples and family'
     # Show the three traces for the first construct
     for i in range(3):
         fig.data[i].visible = True
@@ -410,7 +438,13 @@ def barcode_replicates_per_construct(study, samples, family):
             active = 0,
             buttons = [
                 dict(
-                    args = [{'visible': [True if i==j or i==j+1 or i==j+2 else False for i in range(len(fig.data))]}],
+                    # show/hide the traces for the construct with the annotation
+                    args = [
+                        {'visible': [True if i==j or i==j+1 or i==j+2 else False for i in range(len(fig.data))]},
+                        # update the title of the plot with r2 and pearson correlation
+                        {'title': '{} - {} - r2: {:.2f} - pearson: {:.2f}'.format(family, construct, big_data.loc[big_data['construct'] == construct]['r2'].iloc[0], big_data.loc[big_data['construct'] == construct]['pearson'].iloc[0])}
+                        ],
+
                     label = construct,
                     method = 'update'
                 ) for j, construct in enumerate(unique_constructs)
@@ -428,30 +462,18 @@ def barcode_replicates_per_construct(study, samples, family):
     # Set the titles and aspect ratio to 1
     fig.layout.update(
         title = 'Biological replicates - {}'.format(family),
-        xaxis_title = data['sample'].iloc[0],
-        yaxis_title = data['sample'].iloc[1],
+        xaxis_title = samples[0],
+        yaxis_title = samples[1],
         xaxis = dict(scaleanchor = "y", scaleratio = 1),
         yaxis = dict(scaleanchor = "x", scaleratio = 1),
         height = 700
     )
 
-    # Add Pearson correlation and r2 as annotation
-    fig.add_annotation(
-        x=0.5,
-        y=0.9,
-        xref="paper",
-        yref="paper",
-        text="Pearson correlation: {:.2f} <br> R2: {:.2f}".format(
-                    custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1]), 
-                    r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])),
-        showarrow=False,
-        font=dict(
-            family="Courier New, monospace",
-            size=16,
-            color="black"
-        ))
 
-    return {'fig': fig, 'data': data}
+    
+
+    #TODO data
+    return {'fig': fig, 'data': big_data}
 
     
     
@@ -464,6 +486,9 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             family=family, 
             base_type=['A','C'])
         
+        data = data[['sample','construct','section','mut_rates','sequence']]
+
+        
     if section == 'ROI':
 
         data = study.get_df(
@@ -471,7 +496,7 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             section=section, 
             family=family)
         
-    data = data[['sample','construct','mut_rates','frame_shift_ROI','sequence']]
+        data = data[['sample','construct','section','mut_rates','frame_shift_ROI','sequence']]
     
     if section == 'ROI':
         reference = data[data['sample'] == samples[0]].iloc[0]['sequence']
@@ -525,7 +550,7 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
     # get a neat dataframe with the mutation rates for each base at each deltaG
     data = study.get_df(sample=sample, family=family, section='ROI')
     
-    data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else x)
+    data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
     
     # turn it into a dataframe
     df = pd.DataFrame(

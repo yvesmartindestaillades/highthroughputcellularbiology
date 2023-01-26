@@ -3,18 +3,31 @@ from util import *
 import generate_dataset
 
 if not os.path.exists(saved_feather):
+    print('Loading JSONs...')
+    data = []
+    for f in os.listdir(path_data):
+        if f.endswith('.json'):
+            print(' ' + f, end=' ')
+            data.append(json.load(open(path_data + f, 'r')))
+    print('Done reading data.')
+    print('Creating study...')
     study = dreem.draw.study.Study(
-        data = [json.load(open(path_data + f, 'r')) for f in os.listdir(path_data) if f.endswith('.json')]
+        data = data
     )
-    study.df['deltaG'] = study.df['deltaG'].apply(lambda x: 0 if x == 'void' else x)
+    print('Done creating study.')
+    print('Filtering study...')
+    study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
+    # only keep the constructs that have 8 sections 
+    study.df = study.df[study.df['construct'].isin(study.df.groupby(['sample','construct']).filter(lambda x: len(x) == 8)['construct'])].reset_index(drop=True)
+    print('Finding frame shift ROI...')
     study.df= generate_dataset.find_frame_shift_ROI(study)
+    print('Done finding frame shift ROI.')
+    print('Saving study to df.feather...')
     study.df.to_feather(saved_feather)
+    print('Done saving study to df.feather.')
 else:
     study = dreem.draw.study.Study()
+    print('Reading study from df.feather...')
     study.df = pd.read_feather(saved_feather)
-
-study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
-# only keep the constructs that have 8 sections 
-study.df = study.df[study.df['construct'].isin(study.df.groupby(['sample','construct']).filter(lambda x: len(x) == 8)['construct'])].reset_index(drop=True)
-study.df = generate_dataset.find_frame_shift_ROI(study)
+    print('Done reading study from df.feather.')
 
