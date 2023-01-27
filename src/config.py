@@ -61,7 +61,23 @@ dms_concentration_samples = [
  '10_2_s33new_reads',
  ]
     
-temperature_samples = [] # TODO
+temperature_samples = [
+    '65degrees_1_S20_L001',
+    '5degrees_2_S9_L001', 
+    '37degrees_01percent_2_S17_L001', 
+    '25degrees_2_S13_L001', 
+    '37degrees_1percent_2_S15_L001', 
+    '37degrees_1percent_1_S14_L001', 
+    '25degrees_1_S12_L001', 
+    '37degrees_01percent_1_S16_L001', 
+    '65degrees_2_S21_L001', 
+    '5degrees_1_S8_L001', 
+    '10degrees_2_S11_L001', 
+    '45degrees_2_S19_L001', 
+    '45degrees_1_S18_L001', 
+    '10degrees_1_S10_L001'
+    ]
+# TODO
 
     
 sys.path.append('/Users/ymdt/src/dreem')

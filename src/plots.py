@@ -802,7 +802,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
     
     if len(data) == 0:
-        print('No data: {}, {}'.format(samples, construct))
+        print('No data: samples:{}, construct:{}'.format(samples, construct))
         return {'data': [], 'fig': go.Figure()}
     
     # turn it into a dataframe
@@ -810,7 +810,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
         data = np.array(data['mut_rates'].tolist()),
         index= data[attr].values
-    )
+    ).sort_index().rename_axis(index=attr)
     
     # plot
     paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
