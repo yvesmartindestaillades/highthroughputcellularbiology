@@ -530,6 +530,72 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
     fig.show() 
     
     return {'data': data, 'fig': fig}
+
+
+def biological_replicates_histogram(study, bio_replicates_samples):
+    data_out = pd.DataFrame()
+    fig = go.Figure()
+
+    for samples in bio_replicates_samples:
+        data = {}
+        for s in samples:
+            data[s] = study.df[(study.df['sample'] == s) & (study.df['section'] == 'full')][['sample','construct','mut_rates']].set_index('construct')
+
+        # merge per construct, use samples as suffix for columns
+        data = pd.concat([data[s].rename(columns={'mut_rates': 'mut_rates_{}'.format(s)}) for s in samples], axis=1)
+        data.drop(columns=['sample'], inplace=True)
+
+        def pearson_score_average(list_of_replicates):
+            """
+            Calculate the average of the person correlation scores of all pairs of replicates.
+            """
+            list_of_replicates = list_of_replicates.dropna()
+            scores = []
+            for i in range(len(list_of_replicates)):
+                for j in range(i+1, len(list_of_replicates)):
+                    scores.append(custom_pearsonr(list_of_replicates[i], list_of_replicates[j]))
+            if len(scores) == 0:
+                return np.nan
+            return np.mean(scores)
+
+        data['pearson'] = data.apply(lambda x: pearson_score_average(x), axis=1)
+        data_out = pd.concat([data_out, data], axis=1)
+        
+        # plot pearson as a histogram
+        fig.add_trace(go.Histogram(x=data['pearson'], name='{}-{}'.format(samples[0], samples[1]), visible=False))
+        
+    fig.update_layout(
+        title='Pearson correlation between replicates',
+        xaxis_title='Pearson correlation',
+        yaxis_title='Count',
+    )
+
+    # add a dropdown menu
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                active=0,
+                buttons=[
+                    dict(
+                        label= ' - '.join(samples)[:50],
+                        method="update",
+                        args = [
+                            {'visible' : [True if i == j else False for i in range(len(bio_replicates_samples))]},
+                            {'title' : 'Pearson correlation between replicates '+ ' - '.join(samples)}
+                        ],
+                    ) for j, samples in enumerate(bio_replicates_samples)
+                    ],
+                direction="down",
+                pad={"r": 10, "t": 10},
+                showactive=True,
+                x=1,
+                xanchor="left",
+                y=1.2,
+                yanchor="top"
+            )
+        ]
+    )
+    return {'data': data_out, 'fig': fig}
         
 # ---------------------------------------------------------------------------
 
