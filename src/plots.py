@@ -201,7 +201,7 @@ def barcode_comparison_scatter_plot(study, sample):
                     ))
                     showed_pairs.append((construct, replicate))
                 
-                for trace in __corr_scatter_plot(df):
+                for trace in __corr_scatter_plot(df,visible=False):
                     fig.add_trace(trace)
                     showed_pairs.append((construct, replicate))
                 
@@ -907,7 +907,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     
     return {'data': df, 'fig': fig}
 
-def __corr_scatter_plot(data):
+def __corr_scatter_plot(data, visible=True):
     x, y = data.values()
     x = np.concatenate(x['mut_rates'].values)
     y = np.concatenate(y['mut_rates'].values)
@@ -926,7 +926,8 @@ def __corr_scatter_plot(data):
             line = dict(
                 color = ('rgb(205, 12, 24)'),
                 width = 2,
-            )
+            ),
+            visible=visible
         )
     )
     # Plot x = y
@@ -939,7 +940,8 @@ def __corr_scatter_plot(data):
             line = dict(
                 color = ('rgb(0, 0, 0)'),
                 width = 2,
-            )
+            ),
+            visible=visible
         )
     )
     
@@ -950,7 +952,8 @@ def __corr_scatter_plot(data):
             y = [np.max(y)],
             mode = 'text',
             text = ['Pearson correlation score: {:.2f}'.format(r_value)],
-            textposition = 'top center'
+            textposition = 'top center',
+            visible=visible
         ))
     
     # add the R2 score as a text
@@ -960,7 +963,8 @@ def __corr_scatter_plot(data):
             y = [np.max(y)],
             mode = 'text',
             text = ['R2 score: {:.2f}'.format(r2)],
-            textposition = 'bottom center'
+            textposition = 'bottom center',
+            visible=visible
         ))
     
     return traces
