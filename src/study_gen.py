@@ -10,11 +10,13 @@ if not os.path.exists(saved_feather):
             print(' ' + f, end=' ')
             data.append(json.load(open(path_data + f, 'r')))
     print('Done reading data.')
+    
     print('Creating study...')
     study = dreem.draw.study.Study(
         data = data
     )
     print('Done creating study.')
+    
     print('Filtering study...')
     study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
     # only keep the constructs that have 8 sections 
@@ -22,6 +24,7 @@ if not os.path.exists(saved_feather):
     print('Finding frame shift ROI...')
     study.df= generate_dataset.find_frame_shift_ROI(study)
     print('Done finding frame shift ROI.')
+    
     print('Saving study to df.feather...')
     study.df.to_feather(saved_feather)
     print('Done saving study to df.feather.')

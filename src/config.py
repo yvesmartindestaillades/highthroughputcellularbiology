@@ -46,6 +46,7 @@ bio_replicates_samples = [
     ['10min_1_S20_L001', '10min_2_S21_L001'],
     ['2percent_1_S28_L001', '2percent_2_S29_L001'],
     ['18_DMS_S7_L001', '33DMS_S1', 'Lauren_601_2_S2_L001', 'Lauren_603_3min_S7_L001', 'lauren470_S1'],
+    ['18_DMS_S7_L001', 'Lauren_601_2_S2_L001', 'Lauren_603_3min_S7_L001', 'lauren470_S1'],
     ['19_DMS_S9_L001', '36DMS_S2', 'lauren472_S3'],
     ['5percent_1_S30_L001', '5percent_2_S31_L001'],
     ['10percent_1_S32_L001', '10percent_2_S33_L001']

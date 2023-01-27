@@ -1,15 +1,23 @@
 import os
 import json
-import numpy as np
+import dreem 
 
-path = '/Users/ymdt/src/highthroughputcellularbiology/data'
+# List of JSON files path
+json_files = [os.path.join('data', f) for f in os.listdir('data') if f.endswith('S1.json')]
 
-# for each sample
-    # for each construct
-        # for each section
-            # for "pop_avg"
-                # turn "num_of_mutations" into np.histogram("num_of_mutations").tolist()
-            
+# Read JSON files
+data = [json.load(open(json_file, 'r')) for json_file in json_files]
 
+# Create study
+study = dreem.draw.study.Study(
+    data = data
+)
 
-print([f for f in os.listdir(path) if 'degree' in f])
+# Sanity check
+sample, construct, section = study.df.iloc[0][['sample', 'construct', 'section']]
+plot = study.mutation_fraction(
+    sample = sample,
+    construct = construct,
+    section = section
+)
+

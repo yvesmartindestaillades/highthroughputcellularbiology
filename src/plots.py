@@ -184,22 +184,27 @@ def barcode_comparison_scatter_plot(study, sample):
                 uniquepairs.append((construct, replicate))
                 x = data[data['construct']==construct]
                 y = data[data['construct']==replicate]
-
+                
+                if len(x['mut_rates'].values) != len(y['mut_rates'].values):
+                    print('The number of sections for {} and {} are not the same'.format(construct, replicate))
+                    continue
+                
                 df = {
                     construct: x,
                     replicate: y
                 }
 
                 for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
-                    fig.add_trace(go.Scatter(
-                        x = x[x['section']==section]['mut_rates'].values[0].tolist(),
-                        y = y[y['section']==section]['mut_rates'].values[0].tolist(),
-                        mode = 'markers',
-                        name = section,#' '.join([construct, replicate]),
-                        visible=False,
-                            
-                    ))
-                    showed_pairs.append((construct, replicate))
+                    if len(x[x['section']==section]['mut_rates'].values) > 0 and len(y[y['section']==section]['mut_rates'].values) > 0:
+                        fig.add_trace(go.Scatter(
+                            x = x[x['section']==section]['mut_rates'].values[0].tolist(),
+                            y = y[y['section']==section]['mut_rates'].values[0].tolist(),
+                            mode = 'markers',
+                            name = section,#' '.join([construct, replicate]),
+                            visible=True,
+                                
+                        ))
+                        showed_pairs.append((construct, replicate))
                 
                 for trace in __corr_scatter_plot(df,visible=False):
                     fig.add_trace(trace)
@@ -379,7 +384,7 @@ def barcode_replicates(study):
     return {'fig': fig, 'data': data}
 
     
-def bio_replicates_per_construct(study, samples, family):
+def bio_replicates_per_construct(study, samples, family, correct_bias=False):
         
     fig = go.Figure()
 
@@ -391,6 +396,12 @@ def bio_replicates_per_construct(study, samples, family):
         base_type = ['A','C'],
         section='full'
         )[['sample','construct', 'mut_rates']]
+    
+    if correct_bias:
+        mut_rates = {}
+        for sample in samples:
+            mut_rates[sample] = np.concatenate(big_data[big_data['sample']==sample]['mut_rates'].values[0])
+            
     
     for construct in unique_constructs:
         # add pearson correlation and r2 in big_data columns
