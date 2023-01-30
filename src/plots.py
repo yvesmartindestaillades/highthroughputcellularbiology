@@ -403,8 +403,7 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
     if correct_bias:
         mut_rates = {}
         for sample in samples:
-            mut_rates[sample] = np.concatenate(big_data[big_data['sample']==sample]['mut_rates'].values[0])
-            
+            mut_rates[sample] = big_data[big_data['sample']==sample]['mut_rates'].values[0]
     
     for construct in unique_constructs:
         # add pearson correlation and r2 in big_data columns
@@ -415,6 +414,8 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
     
     assert len(unique_constructs) > 0, 'No constructs found for the given samples and family'
     
+    trace_id = []
+    
     # For each construct plot three traces: the correlation line, the y=x line and the scatter plot
     for i_c, construct in enumerate(unique_constructs):
 
@@ -423,16 +424,43 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
         if not len(data) == 2:
             continue
         
+        x=data['mut_rates'].iloc[0]
+        y=data['mut_rates'].iloc[1]
+        
         # Plot the scatter plot of the two replicates
         fig.add_trace(
-            go.Scatter(x=data['mut_rates'].iloc[0], y=data['mut_rates'].iloc[1], 
+            go.Scatter(x=x, y=y, 
             mode='markers', marker=dict(color='blue'),
             showlegend=False, visible=False,
             ))
         
-            # Add Pearson correlation and r2 as annotation
-
         
+            # Add Pearson correlation and r2 as annotation
+        # add the pearson correlation score as a text
+        
+        fig.add_trace(
+            go.Scatter(
+                x = [np.mean(x)],
+                y = [np.max(y)],
+                mode = 'text',
+                text = ['Pearson correlation score: {:.2f}'.format(custom_pearsonr(x,y))],
+                textposition = 'top center',
+                visible=False,
+                showlegend=False
+            ))
+        
+        # add the R2 score as a text
+        fig.add_trace(
+            go.Scatter(
+                x = [np.mean(x)],
+                y = [np.max(y)],
+                mode = 'text',
+                text = ['R2 score: {:.2f}'.format(r2_score(x,y))],
+                textposition = 'bottom center',
+                visible=False,
+                showlegend=False
+            ))
+            
         # Plot the correlation line and y=x line
         __correlation_scatter_plot(
             x = data['mut_rates'].iloc[0],
@@ -440,9 +468,11 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
             fig=fig
             )
 
+        trace_id += [i_c]*5
+        
     assert len(fig.data) > 0, 'No pairs found for the given samples and family'
     # Show the three traces for the first construct
-    for i in range(3):
+    for i in range(5):
         fig.data[i].visible = True
 
     # add a button to show/hide the traces for each construct
@@ -454,7 +484,7 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
                 dict(
                     # show/hide the traces for the construct with the annotation
                     args = [
-                        {'visible': [True if i==j or i==j+1 or i==j+2 else False for i in range(len(fig.data))]},
+                        {'visible': [True if i==j else False for i in trace_id]},
                         # update the title of the plot with r2 and pearson correlation
                         {'title': '{} - {} - r2: {:.2f} - pearson: {:.2f}'.format(family, construct, big_data.loc[big_data['construct'] == construct]['r2'].iloc[0], big_data.loc[big_data['construct'] == construct]['pearson'].iloc[0])}
                         ],
@@ -867,6 +897,7 @@ def __correlation_scatter_plot(x, y, fig):
         # plot regression line
         x, y = np.array(x), np.array(y)
         slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+        pearson = custom_pearsonr(x,y)
         
         # compute R2
         r2 =  r2_score(y, x)
@@ -976,7 +1007,7 @@ def __corr_scatter_plot(data, visible=True):
             x = [np.mean(x)],
             y = [np.max(y)],
             mode = 'text',
-            text = ['Pearson correlation score: {:.2f}'.format(r_value)],
+            text = ['Pearson correlation score: {:.2f}'.format(custom_pearsonr(x,y))],
             textposition = 'top center',
             visible=visible
         ))
