@@ -132,16 +132,17 @@ def custom_pearsonr(x, y, percentile=90, diff_filter=0.2):
     if min_unique == 2:
         return stats.pearsonr(x, y)[0]
     else:
-        model = LinearRegression()
-        model.fit(x.reshape(-1,1), y)
-        std_err_per_data_point = np.abs(y - model.predict(x.reshape(-1,1)))
-        score_all = stats.pearsonr(x, y)[0]
-        idx_keep = np.where(std_err_per_data_point < np.percentile(std_err_per_data_point, percentile))[0]
-        min_unique = min(len(np.unique(x.take(idx_keep))), len(np.unique(y.take(idx_keep))))
-        if min_unique >=2:
-            score_filter_worst_data_point = stats.pearsonr(x.take(idx_keep), y.take(idx_keep))[0]
-            if score_filter_worst_data_point - score_all > diff_filter:
-                return score_filter_worst_data_point    
+        for vx, vy in [[x, y], [y, x]]:
+            model = LinearRegression()
+            model.fit(vx.reshape(-1,1), vy)
+            std_err_per_data_point = np.abs(vy - model.predict(vx.reshape(-1,1)))
+            score_all = stats.pearsonr(vx, vy)[0]
+            idx_keep = np.where(std_err_per_data_point < np.percentile(std_err_per_data_point, percentile))[0]
+            min_unique = min(len(np.unique(vx.take(idx_keep))), len(np.unique(vy.take(idx_keep))))
+            if min_unique >=2:
+                score_filter_worst_data_point = stats.pearsonr(vx.take(idx_keep), vy.take(idx_keep))[0]
+                if score_filter_worst_data_point - score_all > diff_filter:
+                    return score_filter_worst_data_point    
         return score_all
 
 
