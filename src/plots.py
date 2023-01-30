@@ -18,6 +18,9 @@ import copy
 
 from scipy.optimize import curve_fit
 
+MARKER_RATIO = 2
+
+
 ## b / i - Demultiplexing 
 # ---------------------------------------------------------------------------
 def mutations_in_barcodes(study):
@@ -642,6 +645,7 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
     
     # differentiate between paired and unpaired bases
     paired = [residue for idx, residue in enumerate([False if residue == '.' else True for residue in data['structure'].iloc[0]]) if idx_AC[idx]]
+    aligned = data['num_aligned']
     
     fig = go.Figure()
     
@@ -649,17 +653,19 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
         fig.add_trace(go.Scatter(
             x = df.index,
             y = df[col],
-            mode = 'markers',
+            mode = 'markers+text',
             name = col,
             visible = 'legendonly',
             legendgroup=col,
             marker=dict(
-                size=20,
+                size = np.sqrt(data['num_aligned'].values)/np.mean(np.sqrt(data['num_aligned'].values))*20,
                 line=dict(
                     color='black',
                     width=0 if pair else 3
                 )
             ),
+            text= [str(int(x)) for x in data['num_aligned'].values],
+            textposition='bottom center',
     ))
 
     # Function to fit
@@ -880,7 +886,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
         section='ROI',
         base_type = ['A','C']) 
 
-    data = data[['sample','sequence','mut_rates','index_selected','structure',attr]]
+    data = data[['sample','sequence','mut_rates','index_selected','structure','num_aligned',attr]]
     
     if len(data) == 0:
         print('No data: samples:{}, construct:{}'.format(samples, construct))
@@ -895,6 +901,8 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     
     # plot
     paired = [False if residue == '.' else True for residue in data['structure'].iloc[0]]
+    aligned = data['num_aligned'].values
+    
     
     fig = go.Figure()
     
@@ -902,16 +910,18 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
         fig.add_trace(go.Scatter(
             x = df.index,
             y = df[col],
-            mode = 'markers',
+            mode = 'markers+text',
             name = col,
             visible = 'legendonly',
             marker=dict(
-                size=20,
+                size = np.sqrt(data['num_aligned'].values)/np.mean(np.sqrt(data['num_aligned'].values))*20,
                 line=dict(
                     color='black',
                     width=0 if pair else 3
                 )
             ),
+            text = aligned,
+            textposition = 'bottom center',
     ))
         
     fig.update_layout(

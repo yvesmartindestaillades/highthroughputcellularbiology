@@ -53,10 +53,10 @@ bio_replicates_samples = [
     ]
 
 reaction_time_samples = [
-    'Lauren_603_1min',
-    'Lauren_603_3min',
-    'Lauren_603_5min',
-    'Lauren_603_10min',
+    'Lauren_603_1min_S6_L001',
+    'Lauren_603_3min_S7_L001',
+    'Lauren_603_5min_S8_L001',
+    'Lauren_603_10min_S9_L001',
 ]
 
 dms_concentration_samples = [
@@ -77,12 +77,10 @@ dms_concentration_samples = [
 temperature_samples = [
     '65degrees_1_S20_L001',
     '5degrees_2_S9_L001', 
-    '37degrees_01percent_2_S17_L001', 
     '25degrees_2_S13_L001', 
     '37degrees_1percent_2_S15_L001', 
     '37degrees_1percent_1_S14_L001', 
     '25degrees_1_S12_L001', 
-    '37degrees_01percent_1_S16_L001', 
     '65degrees_2_S21_L001', 
     '5degrees_1_S8_L001', 
     '10degrees_2_S11_L001', 
