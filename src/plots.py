@@ -745,7 +745,11 @@ def heatmap_across_family_members(study, sample):
     
     fig = go.Figure()
     
-    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')]
+    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')][['sample','family', 'construct', 'frame_shift_ROI', 'mut_rates','sequence']].reset_index(drop=True)
+    # reference is the longest sequence of the family
+    for family in big_data['family'].unique():
+        reference = big_data[(big_data['family'] == family)].sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values[0]
+        big_data.loc[big_data['family']==family, 'mut_rates'] = big_data[big_data['family']==family].apply(lambda x: np.array(int(x['frame_shift_ROI'])*[np.nan] + list(x['mut_rates']) + [np.nan]*(len(reference)-int(x['frame_shift_ROI'])-len(x['mut_rates']))), axis=1)
     
     # add each family as a plot but show only one at the time
     for family in big_data['family'].unique():
@@ -755,10 +759,10 @@ def heatmap_across_family_members(study, sample):
         data_all_samples = study.df[(study.df['family'] == family) & (study.df['section'] == 'ROI')]
         sequences_ROI = data_all_samples.sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values
         reference = sequences_ROI[0]
-        
+                
         df = pd.DataFrame(
             columns = [base + str(idx + 1) for base, idx in zip(reference, range(len(reference)))],
-            data = [int(offset)*[np.nan] + list(mr) + [np.nan]*(len(reference)-int(offset)-len(mr)) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+            data = np.vstack(data['mut_rates'].values),
             index = data['construct'].values 
         ).sort_index(ascending=False)
         
