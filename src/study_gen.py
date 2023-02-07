@@ -1,6 +1,7 @@
 from config import *
 from util import *
 import generate_dataset
+import dreem
 
 if not os.path.exists(saved_feather):
     print('Loading JSONs...')

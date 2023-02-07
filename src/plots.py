@@ -17,6 +17,8 @@ import plotly.express as px
 import copy 
 
 from scipy.optimize import curve_fit
+import plotly.graph_objects as go
+from scipy.stats import norm
 
 MARKER_RATIO = 2
 
@@ -159,7 +161,7 @@ def distribution_of_the_mean(means, residues_set, bounds):
 # ---------------------------------------------------------------------------
 SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES = ['MS2','TC1','ROI','TC2','LAH','buffer']
 
-def barcode_comparison_scatter_plot(study, sample):
+def barcode_comparison_scatter_plot(study, sample): #TODO
     """ generate plots for comparing barcode replicates
     
     A scatter plot is generated for each section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES
@@ -173,11 +175,21 @@ def barcode_comparison_scatter_plot(study, sample):
     replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
     assert len(replicates_lists) > 0, 'No barcode replicates found for sample {}'.format(sample)
     
+    barcode_bounds = [139,151]
+    
     data = study.get_df(
             sample = sample, 
-            section = SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES, 
+            section = 'full',
             base_type = ['A','C'])[['sample','construct','section','mut_rates']]
     
+    def assert_length(x, length):
+        assert len(x) == length, 'The length of the barcode is not the same: {} vs {}'.format(len(x), length)
+        return x
+    
+    data['mut_rates'] = data['mut_rates'].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
+    
+    data['mut_rates'] = data['mut_rates'].apply(lambda x: assert_length(x, 170-12))
+
     showed_pairs = []
     uniquepairs = []
     for construct, replicates in replicates_lists.items():
@@ -185,31 +197,22 @@ def barcode_comparison_scatter_plot(study, sample):
             if not (replicate, construct) in showed_pairs:
                 
                 uniquepairs.append((construct, replicate))
-                x = data[data['construct']==construct]
-                y = data[data['construct']==replicate]
+                x = data[data['construct']==construct]['mut_rates'].values[0]
+                y = data[data['construct']==replicate]['mut_rates'].values[0]
                 
-                if len(x['mut_rates'].values) != len(y['mut_rates'].values):
-                    print('The number of sections for {} and {} are not the same'.format(construct, replicate))
-                    continue
-                
-                df = {
-                    construct: x,
-                    replicate: y
-                }
+                assert len(x) == len(y), 'The length of the two replicates are not the same: {} vs {}'.format(len(x), len(y))
 
-                for section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES:
-                    if len(x[x['section']==section]['mut_rates'].values) > 0 and len(y[y['section']==section]['mut_rates'].values) > 0:
-                        fig.add_trace(go.Scatter(
-                            x = x[x['section']==section]['mut_rates'].values[0].tolist(),
-                            y = y[y['section']==section]['mut_rates'].values[0].tolist(),
-                            mode = 'markers',
-                            name = section,#' '.join([construct, replicate]),
-                            visible=True,
-                                
-                        ))
-                        showed_pairs.append((construct, replicate))
-                
-                for trace in __corr_scatter_plot(df,visible=False):
+                fig.add_trace(go.Scatter(
+                    x = x,
+                    y = y, 
+                    mode = 'markers',
+                    name = 'mutation rates',#' '.join([construct, replicate]),
+                    visible=True,
+                        
+                ))
+                showed_pairs.append((construct, replicate))
+                    
+                for trace in __corr_scatter_plot(x, y, visible=False):
                     fig.add_trace(trace)
                     showed_pairs.append((construct, replicate))
                 
@@ -718,8 +721,11 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
             # Do a Monte Carlo simulation to estimate the uncertainty in the fit parameters using a multinormal distribution
             # with the covariance matrix as the covariance matrix
             N = 1000
-            param_samples = np.clip(np.random.multivariate_normal(popt, pcov, N).T.reshape(3, N, 1), 0, np.inf)
-
+            try:
+                param_samples = np.clip(np.random.multivariate_normal(popt, pcov, N).T.reshape(3, N, 1), 0, np.inf)
+            except:
+                continue
+            
             # Compute the sigmoid for each set of parameters for each x value
             y_MC = sigmoid(xdata_MC.reshape(1, -1) , param_samples[0], param_samples[1], param_samples[2])
 
@@ -728,7 +734,7 @@ def mut_rate_across_family_vs_deltaG(study, sample, family):
                                     marker_color=colors[i_b]))
 
             fig.add_trace(go.Scatter(x=np.concatenate((xdata_MC, xdata_MC[::-1])), # x, then x reversed
-                                    y=np.concatenate((np.percentile(y_MC, 97.5, axis=0), np.percentile(y_MC, 2.5, axis=0)[::-1])), # upper, then lower reversed
+                                    y= np.clip(np.concatenate((np.percentile(y_MC, 97.5, axis=0), np.percentile(y_MC, 2.5, axis=0)[::-1])), 0, 1), # upper, then lower reversed
                                     fill='toself',
                                     fillcolor=colors[i_b],
                                     line=dict(color=colors[i_b]),
@@ -878,6 +884,154 @@ def heatmap_across_family_members(study, sample):
     """
 
 
+def kfold_per_family(study, sample, family):
+    # get a neat dataframe with the mutation rates for each base at each deltaG
+    data = study.get_df(sample=sample, family=family, section='ROI')
+
+    data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
+
+    assert len(data)>0, 'No data for sample {} and family {}'.format(sample, family)
+
+    # turn it into a dataframe
+    df = pd.DataFrame(
+        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
+        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+        index= data['deltaG'].values
+    )
+
+    # only keep the A and C bases
+    idx_AC = [col[0] in ['A','C'] for col in df.columns]
+    df = df.loc[:,idx_AC]
+
+    # remove the bases that do not have a value for deltaG == 0.0
+    df = df.loc[:,df.loc[0.0].notna().sum() > 0]
+
+    # Function to fit
+    def sigmoid(x, a, b, c):
+        RT = 1.987204258*310/1000
+        return a / (1 + b*np.exp(-x/RT)) + c
+    
+    # Reverse sigmoid function
+    def rev_sigmoid(y, a, b, c):
+        RT = 1.987204258*310/1000
+        return -RT*np.log((a-y+c)/((y-c)*b))
+
+    # Output values 
+    base_Kfold = {}
+
+    for i_b, (base, mut_rate) in enumerate(df.iteritems()):
+        dG = df.index[~np.isnan(mut_rate)].values
+        mut_rate = mut_rate[~np.isnan(mut_rate)].values
+
+        if len(mut_rate) >= 3:
+            popt, pcov = curve_fit(sigmoid, dG, mut_rate, p0=[0.04, 0.02, 0.00], bounds=([0, 0, 0], [0.1, np.inf, 0.05]), max_nfev=1000)
+
+            xdata_MC = np.array([min(dG), max(dG)])
+            y_fit = sigmoid(xdata_MC, *popt)
+
+            # Do a Monte Carlo simulation to estimate the uncertainty in the fit parameters using a multinormal distribution
+            # with the covariance matrix as the covariance matrix
+            N = 1000
+            param_samples = np.clip(np.random.multivariate_normal(popt, pcov, N).T.reshape(3, N, 1), 0, np.inf)
+
+            # Compute the sigmoid for each set of parameters for each x value
+            y_MC = sigmoid(xdata_MC.reshape(1, -1) , param_samples[0], param_samples[1], param_samples[2])
+            
+            base_Kfold[base] = {'avg_mr': np.mean(y_fit), 'Kfold': rev_sigmoid(np.mean(y_fit), *popt)}
+
+    df = pd.DataFrame(base_Kfold).T
+
+    # make a gaussian fit to the data
+    x = np.linspace(1.2*min(df['Kfold']), 0.8*max(df['Kfold']), 100)
+    y = norm.pdf(x, np.mean(df['Kfold']), np.std(df['Kfold']))
+    df['norm'] = norm.pdf(df['Kfold'], np.mean(df['Kfold']), np.std(df['Kfold']))
+
+    fig = go.Figure()
+    # legend the data "experimental data"
+    fig.add_trace(
+        go.Scatter(
+            x=df['Kfold'],
+            y = df['norm'],
+            mode='markers+text',
+            text=df.index,
+            name='Experimental data',
+            textposition='bottom center',
+        )
+    )
+    fig.add_trace(
+        go.Line(
+            x=x,
+            y=y,
+            mode='lines',
+            name='Gaussian fit',
+            line=dict(color='red', width=2)
+        )
+    )
+
+    # add peak at the mean and show it in the legend
+    fig.add_shape(
+        type="line",
+        x0=np.mean(df['Kfold']),
+        y0=0,
+        x1=np.mean(df['Kfold']),
+        y1=norm.pdf(np.mean(df['Kfold']), np.mean(df['Kfold']), np.std(df['Kfold'])),
+        line=dict(
+            color="red",
+            width=2,
+        ),
+        name='Fit mean')
+    
+    # add the standard deviation
+    fig.add_annotation(
+        x=x[33],
+        y=y[33],
+        xref="x",
+        yref="y",
+        text="Std: {:.4f}".format(np.std(df['Kfold'])),
+        showarrow=True,
+        arrowhead=3,
+        arrowcolor="red",
+        ax=50,
+        ay=0,
+        font=dict(
+            size=18
+        )
+    )
+    
+        
+
+    # show the mean in the x axis
+    fig.add_annotation(
+        x=np.mean(df['Kfold']),
+        y=0,
+        xref="x",
+        yref="y",
+        text="Mean: {:.4f}".format(np.mean(df['Kfold'])),
+        showarrow=True,
+        arrowhead=3,
+        arrowcolor="red",
+        ax=0,
+        ay=-40,
+        font=dict(
+            size=18
+        )
+    )
+
+
+    fig.update_layout(
+        title='Kfold distribution for sample {} and family {}'.format(sample, family),
+        xaxis_title='Kfold',
+        yaxis_title='Probability density',
+        legend_title='Legend',
+        font=dict(
+            size=18
+        )
+    )
+
+    return {'fig': fig, 'data': df}
+
+
+
 # ---------------------------------------------------------------------------
 
 # utils
@@ -963,11 +1117,8 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     
     return {'data': df, 'fig': fig}
 
-def __corr_scatter_plot(data, visible=True):
-    x, y = data.values()
-    x = np.concatenate(x['mut_rates'].values)
-    y = np.concatenate(y['mut_rates'].values)
-    
+def __corr_scatter_plot(x, y, visible=True):
+
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
     r2 =  r2_score(y, x)
     
