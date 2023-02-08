@@ -19,6 +19,7 @@ import copy
 from scipy.optimize import curve_fit
 import plotly.graph_objects as go
 from scipy.stats import norm
+from plotly.subplots import make_subplots
 
 MARKER_RATIO = 2
 
@@ -89,8 +90,8 @@ def mutations_per_read(study, sample):
     bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
-def mutation_identity_at_each_position(study, sample, construct):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')].iloc[0]
+def mutation_identity_at_each_position(study, sample, construct, section='full'):
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -101,8 +102,8 @@ def mutation_identity_at_each_position(study, sample, construct):
     return {'fig': stacked_bar, 'data': df}
 
  
-def mutation_fraction_at_each_position(study, sample, construct):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')].iloc[0]
+def mutation_fraction_at_each_position(study, sample, construct, section='full'):
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
     df = pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -154,6 +155,115 @@ def distribution_of_the_mean(means, residues_set, bounds):
         plt.legend()
         plt.tight_layout()
     plt.tight_layout()
+    
+    
+def replicates_fisher_pearson_decorator(function):
+    def replicates_fisher_pearson(study, sample):
+        replicates_lists, data, title = function(study, sample)
+        data['mut_rates'] = data.apply(lambda x: [x['mut_rates'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']], axis=1)
+        data.reset_index(inplace=True, drop=True)
+
+        p_values_true_data = []
+        p_values_fake_data = []
+        pearsonr_true_data = []
+        pearsonr_fake_data = []
+        
+        # Calculate the Fisher's exact test
+        def fisher_exact_test(n1, p1, n2, p2):
+            # Calculate the odds ratio
+            oddsratio, pvalue = stats.fisher_exact([[n1*p1, n1*(1-p1)], [n2*p2, n2*(1-p2)]])
+            return oddsratio, pvalue
+        
+        # Combine the p-values using the Fisher's method
+        def combine_pvalues(pvalues):
+            return -2 * np.sum(np.log(pvalues))
+
+
+        def fisher_compute_and_combine_pvalues(n1, mr1, n2, mr2):
+            # Calculate the p-values
+            pval = []
+            for p1, p2 in zip(mr1, mr2):
+                oddsratio, pvalue = fisher_exact_test(n1, p1, n2, p2)
+                pval.append(pvalue)
+
+            # Combine the p-values
+            combined_pvalue = combine_pvalues(pval)
+
+            # Compute the p-value from the chi-squared distribution
+            pvalue = 1 - stats.chi2.cdf(combined_pvalue, 2 * len(pval))
+            
+            return pvalue
+
+        for construct, replicates in replicates_lists.items():
+            for replicate in replicates:
+                if construct not in data['construct'].values or replicate not in data['construct'].values:
+                    print('Construct or replicate not found in the data: {} {}'.format(construct, replicate))
+                    continue
+                
+                # using the true data
+                n1 = data[data['construct'] == construct]['num_aligned'].values[0]
+                n2 = data[data['construct'] == replicate]['num_aligned'].values[0]
+                mr1 = data[data['construct'] == construct]['mut_rates'].values[0]
+                mr2 = data[data['construct'] == replicate]['mut_rates'].values[0]
+
+                p_values_true_data.append(fisher_compute_and_combine_pvalues(n1, mr1, n2, mr2))
+                pearsonr_true_data.append(stats.pearsonr(mr1, mr2)[0])
+
+                # Using the fake data
+                mr1 = np.random.binomial(n1, mr1)/n1
+                mr2 = np.random.binomial(n2, mr1)/n2
+                
+                p_values_fake_data.append(fisher_compute_and_combine_pvalues(n1, mr1, n2, mr2))
+                pearsonr_fake_data.append(stats.pearsonr(mr1, mr2)[0])
+                
+                # TODO: average the replicates 
+                
+        fig = make_subplots(rows=2, cols=1, subplot_titles=('Pearson correlation', 'Combined p-values from Fisher exact test'), vertical_spacing=0.2, shared_xaxes=False)
+        # increase height
+        fig.update_layout(height=800)
+
+
+        # group the legend with the names
+        fig.add_trace(go.Histogram(x=pearsonr_true_data, histnorm='percent',  marker_color='blue', name='True data', xbins=dict(start=0, end=1, size=0.05), legendgroup='True data'), row=1, col=1)
+        fig.add_trace(go.Histogram(x=pearsonr_fake_data, histnorm='percent',  marker_color='red', name='Fake data: split a bitvector', xbins=dict(start=0, end=1, size=0.05), legendgroup='Fake data'), row=1, col=1)
+
+        fig.add_trace(go.Histogram(x=p_values_true_data, histnorm='percent', marker_color='blue',  showlegend=False, xbins=dict(start=0, end=1, size=0.05), hovertemplate='p-value: %{x:.2f}<extra></extra>', legendgroup='True data'), row=2, col=1)
+        fig.add_trace(go.Histogram(x=p_values_fake_data, histnorm='percent', marker_color='red', showlegend=False, xbins=dict(start=0, end=1, size=0.05), hovertemplate='p-value: %{x:.2f}<extra></extra>', legendgroup='Fake data'), row=2, col=1)
+
+        fig['layout']['title'] = title
+        fig['layout']['xaxis']['title']= 'Pearson correlation'
+        fig['layout']['xaxis2']['title']='p-value of the Fisher exact test per residue, combined per construct with the Fisher method'
+        fig['layout']['yaxis']['title']='Percent'
+        fig['layout']['yaxis2']['title']='Percent'
+        
+        return {'data': data, 'fig': fig}
+    return replicates_fisher_pearson
+
+
+@replicates_fisher_pearson_decorator
+def barcodes_replicates_fisher_pearson(study, sample):
+    replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
+    data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'full')][['sample','construct','section','mut_rates','num_aligned','sequence']]
+    barcode_bounds = [139,151]
+
+    for col in ['mut_rates','sequence']:
+        data[col] = data[col].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
+        
+    title = 'Similarity test between barcode replicates using Pearson correlation and Fisher exact test for sample {}'.format(sample)
+
+    return replicates_lists, data, title
+
+@replicates_fisher_pearson_decorator
+def biological_replicates_fisher_pearson(study, sample):
+    data = study.df[(study.df['sample'].isin(sample)) & (study.df['section'] == 'full')][['sample','construct','section','mut_rates','num_aligned','sequence']]
+    if sample[0] != sample[1]:
+        data = data.groupby('construct').filter(lambda x: len(x) == 2)
+    replicates_lists = {construct+'_'+sample[0]: [construct+'_'+sample[1]] for construct in data['construct'].unique()}
+    data['construct'] = data.apply(lambda x: x['construct'] + '_' + x['sample'], axis=1)
+    
+    title = 'Similarity test between biological replicates using Pearson correlation and Fisher exact test for samples {} and {}'.format(sample[0], sample[1])
+    
+    return replicates_lists, data, title
         
 # ---------------------------------------------------------------------------
 
