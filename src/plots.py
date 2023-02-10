@@ -20,6 +20,7 @@ from scipy.optimize import curve_fit
 import plotly.graph_objects as go
 from scipy.stats import norm
 from plotly.subplots import make_subplots
+from util import compute_wilson_interval
 
 MARKER_RATIO = 2
 
@@ -92,24 +93,51 @@ def mutations_per_read(study, sample):
 
 def mutation_identity_at_each_position(study, sample, construct, section='full'):
     data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
-    df = pd.DataFrame(index = list(data['sequence']))
+    df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
+
+    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in data['mut_rates']]
+    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['mut_rates']]
+
     for base in ['A','C','G','T']:
         df[base] = np.array(data['mod_bases_'+base])/np.array(data['info_bases'])
         stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
-
-    return {'fig': stacked_bar, 'data': df}
+    
+    # add error bars to stacked_bar[-1]
+    stacked_bar[-1]['error_y'] = dict(
+        type='data',
+        array= [data['err_max'][i]-data['mut_rates'][i] for i in range(len(data['sequence']))],
+        arrayminus = [data['mut_rates'][i]-data['err_min'][i] for i in range(len(data['sequence']))],
+        visible=True,
+        symmetric=False,
+        thickness=1.5,
+        width=2,
+        color='black'
+    )
+        
+    return {'fig':stacked_bar, 'data':df}
 
  
 def mutation_fraction_at_each_position(study, sample, construct, section='full'):
     data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
-    df = pd.DataFrame(index = list(data['sequence']))
+    df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
+    
+    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in  data['mut_rates']]
+    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['mut_rates']]
+
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
     for base in ['A','C','G','T']:
-        df[base] = [mr if b==base  else np.nan for mr, b in zip(data['mut_rates'], data['sequence'])]
-        stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
+        for d, col in zip([df, df_err_min, df_err_max], ['mut_rates', 'err_min', 'err_max']):
+            d[base] = [mr if b==base  else np.nan for mr, b in zip(data[col], data['sequence'])]
+        stacked_bar.append(
+            go.Bar
+            (x=np.arange(len(data['sequence'])), 
+            y=list(df[base]), 
+            marker_color=color_map[base], 
+            error_y=dict(type='data', symmetric=False, array=list(df_err_max[base]-df[base]), arrayminus=list(df[base]-df_err_min[base])), 
+            showlegend=False)) 
     
     return {'fig': stacked_bar, 'data': df}
 
