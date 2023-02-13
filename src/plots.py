@@ -85,13 +85,30 @@ def num_aligned_reads_per_construct(study, sample):
 
 ## b / ii - DMS-MaPseq
 # ---------------------------------------------------------------------------
-def mutations_per_read(study, sample):
+def _mutations_per_read_subplot(study, sample):
     data = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
     hist = np.sum(np.stack(data.values), axis=0)
     bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
-def mutation_identity_at_each_position(study, sample, construct, section='full'):
+def mutations_per_read(study, unique_samples):
+    if not isinstance(unique_samples, list) and not isinstance(unique_samples, tuple) and not isinstance(unique_samples, np.ndarray) and not isinstance(unique_samples, set):
+        unique_samples = [unique_samples]
+        
+    fig = make_subplots(rows=len(unique_samples), cols=1, vertical_spacing=0.4/len(unique_samples),
+                        subplot_titles=['Number of mutations per read - {}'.format(sample) for sample in unique_samples])
+    for i_s, sample in enumerate(unique_samples):
+        fig.add_trace(_mutations_per_read_subplot(study, sample), row=i_s+1, col=1 )
+        fig.update_yaxes(title='Count')
+        fig.update_xaxes(dtick=10)
+
+    fig.update_layout(autosize=True, height=len(unique_samples)*500, title='Number of mutation per read across samples')
+    return {
+        'fig':fig,
+        'data':study.df[study.df['section']=='full'][['sample','construct','num_of_mutations']]
+        }
+
+def _mutation_identity_at_each_position_subplot(study, sample, construct, section='full'):
     data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
     df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
@@ -118,9 +135,50 @@ def mutation_identity_at_each_position(study, sample, construct, section='full')
         
     return {'fig':stacked_bar, 'data':df}
 
+def mutation_identity_at_each_position(study, sample, unique_constructs, section='full'):
+
+    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
+        unique_constructs = [unique_constructs]
+    
+    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
+                    subplot_titles=['Mutation identity at each position - {} - {} reads'.format(cst, reads) for cst, reads in zip(unique_constructs, study.df[(study.df['sample']==sample)&(study.df['construct'].isin(unique_constructs))&(study.df['section']=='full')]['num_aligned'])])
+    
+    for i_c, construct in enumerate(unique_constructs):
+        muts_identity = _mutation_identity_at_each_position_subplot(study, sample, construct, section)
+
+        for bar in muts_identity['fig']:
+            fig.add_trace( bar, row=i_c+1, col=1 )
+        
+        fig.update_xaxes(tickangle=0, 
+                tickvals=np.arange(len(muts_identity['data'].index)), ticktext=list(muts_identity['data'].index), tickfont={'size':8},
+                row=i_c+1, col=1)
+            
+    for trace, name in zip(fig["data"][:4], ['A','C','G','T']):
+        trace.update(showlegend=True)
+        trace["name"] = name
+
+    fig.update_yaxes(title='Mutation fraction')
+    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1500)
+    plot = {
+        'fig':fig,
+        'data':study.df[
+            (study.df['sample']==sample)&
+            (study.df['construct'].isin(unique_constructs))&
+            (study.df['section']=='full')]\
+        [['sample','construct','mod_bases_A','mod_bases_C','mod_bases_G','mod_bases_T','num_aligned']]
+        }
+    return plot
+
  
-def mutation_fraction_at_each_position(study, sample, construct, section='full'):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
+def _mutation_fraction_at_each_position_subplot(study, sample, construct, section='full'):
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)]
+    
+    if len(data) >= 1:
+        data = data.iloc[0]
+    else:
+        print('No data for sample {} construct {} section {}'.format(sample, construct, section))
+        return {'fig':[], 'data':[]}
+    
     df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     
@@ -141,7 +199,46 @@ def mutation_fraction_at_each_position(study, sample, construct, section='full')
     
     return {'fig': stacked_bar, 'data': df}
 
-def read_coverage_per_position(study, sample, construct):
+def mutation_fraction_at_each_position(study, sample, unique_constructs, section='full'):
+
+    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
+        unique_constructs = [unique_constructs]
+
+    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
+                        subplot_titles=['Mutation fraction at each position - {}'.format(cst) for cst in unique_constructs])
+    for i_c, construct in enumerate(unique_constructs):
+        muts_identity = _mutation_fraction_at_each_position_subplot(study, sample, construct, section)
+
+        if len(muts_identity['fig']) == 0:
+            continue
+        
+        for bar in muts_identity['fig']:
+            fig.add_trace( bar, row=i_c+1, col=1 )
+        
+        fig.update_xaxes(tickangle=0, 
+                tickvals=np.arange(len(muts_identity['data'].index)), ticktext=list(muts_identity['data'].index), tickfont={'size':8},
+                row=i_c+1, col=1)
+            
+    for trace, name in zip(fig["data"][:4], ['A','C','G','T']):
+        trace.update(showlegend=True)
+        trace["name"] = name
+
+    fig.update_yaxes(title='Mutation fraction')
+    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1500)
+    plot = {
+        'fig':fig,
+        'data':study.df[
+            (study.df['sample']==sample)&
+            (study.df['construct'].isin(unique_constructs))&
+            (study.df['section']=='full')]\
+        [['sample','construct','mut_rates','num_aligned']]
+        }
+    
+    return plot
+
+
+
+def _read_coverage_per_position_subplot(study, sample, construct):
     data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct)]
     sections, section_start, section_end = data['section'].unique(), data['section_start'].unique(), data['section_end'].unique()
     idx = np.argsort(section_start)
@@ -161,6 +258,38 @@ def read_coverage_per_position(study, sample, construct):
                 showlegend=False) )
     data['section'] = sections
     return {'fig': scatters, 'data': data}
+
+def read_coverage_per_position(study, sample, unique_constructs):
+    
+    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
+        unique_constructs = [unique_constructs]
+
+    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
+                        subplot_titles=['Read coverage per position - {}'.format(cst) for cst in unique_constructs])
+    
+    for i_c, construct in enumerate(unique_constructs):
+        read_coverage = _read_coverage_per_position_subplot(study, sample, construct)
+
+        for bar in read_coverage['fig']:
+            fig.add_trace( bar, row=i_c+1, col=1 )
+
+    # print a legend for each section
+    for trace, name in zip(fig["data"][:len(read_coverage['data']['section'])], read_coverage['data']['section']):
+        trace.update(showlegend=True)
+        trace["name"] = name
+
+    fig.update_yaxes(title='Read coverage')
+    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1300)
+    plot = {
+        'fig':fig,
+        'data':study.df[
+            (study.df['sample']==sample)&
+            (study.df['construct'].isin(unique_constructs))&
+            (study.df['section']=='full')]\
+        [['sample','construct','cov_bases']]
+        }
+
+    return plot
     
 # ---------------------------------------------------------------------------
 
