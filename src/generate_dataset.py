@@ -2,6 +2,8 @@ import scipy.stats
 import numpy as np
 from util import findall, custom_pearsonr
 import pandas as pd
+from scipy.optimize import curve_fit
+from scipy.stats import norm
 
 def generate_barcode_replicates_pairs(study, sample):
     data = study.get_df(sample=sample, section = 'ROI')[['sequence', 'construct']]
@@ -66,3 +68,102 @@ def find_frame_shift_ROI(study):
 
     df = study.df.merge(df[['sample','construct','section','sequence','frame_shift_ROI']], on=['sample','construct','section','sequence'], how='left')
     return df
+
+
+def compute_k_fold_fit(study, sample, family, stride='turner'):
+    """Compute the K-fold fit for a given sample and family
+    
+    Parameters
+    ----------
+    study : Study
+        Study object
+    sample : str
+        Sample name
+    family : str
+        Family name
+    stride : str, optional
+        Stride to use for the fit, by default 'turner'. Can be 'turner' or 'child#'.
+        
+    """
+    
+    data = study.get_df(sample=sample, family=family, section='ROI') #TODO remove unpaired bases
+
+    data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
+
+    assert len(data)>0, 'No data for sample {} and family {}'.format(sample, family)
+
+    # turn it into a dataframe
+    df = pd.DataFrame(
+        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
+        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+        index= data['deltaG'].values
+    )
+
+    # Only keep the paired bases
+    paired = [c in ['(',')'] for c in data['structure'].iloc[0]]
+    df = df.loc[:,paired]
+    
+    # only keep the A and C bases
+    idx_AC = [col[0] in ['A','C'] for col in df.columns]
+    df = df.loc[:,idx_AC]
+
+    # remove the bases that do not have a value for deltaG == 0.0
+    try:
+        df = df.loc[:,df.loc[0.0].notna().sum() > 0]
+    except KeyError:
+        print('No data for deltaG == 0.0 for sample {} and family {}'.format(sample, family))
+        return pd.DataFrame({'Kfold':[]})
+    
+    
+    # Change the index to be linear if needed
+    if stride == 'child#':    
+        df = df.reset_index().rename(columns={'index':'deltaG'})
+        for idx, (dG, row) in enumerate(df.groupby('deltaG')):
+            df.loc[row.index, 'child#'] = idx
+        
+        df.set_index('child#', inplace=True)
+
+    # Function to fit
+    def sigmoid(x, a, b, c):
+        RT = 1.987204258*310/1000
+        return a / (1 + b*np.exp(-x/RT)) + c
+    
+    # Reverse sigmoid function
+    def rev_sigmoid(y, a, b, c):
+        RT = 1.987204258*310/1000
+        return -RT*np.log((a-y+c)/((y-c)*b))
+
+    # Output values 
+    base_Kfold = {}
+
+    for base, mut_rate in df.iteritems():
+        
+        if base == 'deltaG':
+            continue
+        
+        x_data = df.index[~np.isnan(mut_rate)].values
+        mut_rate = mut_rate[~np.isnan(mut_rate)].values
+
+        if len(mut_rate) >= 3: # at least 3 points to fit the sigmoid
+            
+            # Fit the sigmoid
+            popt, pcov = curve_fit(sigmoid, x_data, mut_rate, p0=[0.04, 0.02, 0.00], bounds=([0, 0, 0], [0.1, np.inf, 0.05]), max_nfev=1000)
+        
+            # Compute the sigmoid midpoint 
+            LARGE_VALUE = 100   
+            midpoint_y = np.mean([sigmoid(LARGE_VALUE, *popt), sigmoid(-LARGE_VALUE, *popt)])  
+            midpoint_y = min(max(midpoint_y, min(mut_rate)), max(mut_rate))
+            
+            midpoint_x = max(min(max(df.index),rev_sigmoid(midpoint_y, *popt)), min(df.index))
+            
+            # Store the results       
+            base_Kfold[base] = {'avg_mr': midpoint_y, 'Kfold': midpoint_x}
+            
+
+    df = pd.DataFrame(base_Kfold).T
+
+    # make a gaussian fit to the data
+    df['norm'] = norm.pdf(df['Kfold'], np.mean(df['Kfold']), np.std(df['Kfold']))
+    
+    return df
+    

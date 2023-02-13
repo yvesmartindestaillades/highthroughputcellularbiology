@@ -1022,68 +1022,17 @@ def heatmap_across_family_members(study, sample):
     """
 
 
-def kfold_per_family(study, sample, family):
-    # get a neat dataframe with the mutation rates for each base at each deltaG
-    data = study.get_df(sample=sample, family=family, section='ROI')
-
-    data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
-
-    assert len(data)>0, 'No data for sample {} and family {}'.format(sample, family)
-
-    # turn it into a dataframe
-    df = pd.DataFrame(
-        columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
-        index= data['deltaG'].values
-    )
-
-    # only keep the A and C bases
-    idx_AC = [col[0] in ['A','C'] for col in df.columns]
-    df = df.loc[:,idx_AC]
-
-    # remove the bases that do not have a value for deltaG == 0.0
-    df = df.loc[:,df.loc[0.0].notna().sum() > 0]
-
-    # Function to fit
-    def sigmoid(x, a, b, c):
-        RT = 1.987204258*310/1000
-        return a / (1 + b*np.exp(-x/RT)) + c
+def kfold_per_family(study, sample, family, stride = 'turner'):
     
-    # Reverse sigmoid function
-    def rev_sigmoid(y, a, b, c):
-        RT = 1.987204258*310/1000
-        return -RT*np.log((a-y+c)/((y-c)*b))
-
-    # Output values 
-    base_Kfold = {}
-
-    for i_b, (base, mut_rate) in enumerate(df.iteritems()):
-        dG = df.index[~np.isnan(mut_rate)].values
-        mut_rate = mut_rate[~np.isnan(mut_rate)].values
-
-        if len(mut_rate) >= 3:
-            popt, pcov = curve_fit(sigmoid, dG, mut_rate, p0=[0.04, 0.02, 0.00], bounds=([0, 0, 0], [0.1, np.inf, 0.05]), max_nfev=1000)
-
-            xdata_MC = np.array([min(dG), max(dG)])
-            y_fit = sigmoid(xdata_MC, *popt)
-
-            # Do a Monte Carlo simulation to estimate the uncertainty in the fit parameters using a multinormal distribution
-            # with the covariance matrix as the covariance matrix
-            N = 1000
-            param_samples = np.clip(np.random.multivariate_normal(popt, pcov, N).T.reshape(3, N, 1), 0, np.inf)
-
-            # Compute the sigmoid for each set of parameters for each x value
-            y_MC = sigmoid(xdata_MC.reshape(1, -1) , param_samples[0], param_samples[1], param_samples[2])
-            
-            base_Kfold[base] = {'avg_mr': np.mean(y_fit), 'Kfold': rev_sigmoid(np.mean(y_fit), *popt)}
-
-    df = pd.DataFrame(base_Kfold).T
-
+    assert stride in ['turner', 'child#'], 'stride must be either "turner" or "child#"'
+    
+    # get a neat dataframe with the mutation rates for each base at each deltaG
+    df = generate_dataset.compute_k_fold_fit(study, sample, family, stride)
+    
     # make a gaussian fit to the data
-    x = np.linspace(1.2*min(df['Kfold']), 0.8*max(df['Kfold']), 100)
+    x = np.linspace(1.2*min(df['Kfold']), 0.8*max(df['Kfold']), 100) if stride == 'turner' else np.linspace(0.8*min(df['Kfold']), 1.2*max(df['Kfold']), 100)
     y = norm.pdf(x, np.mean(df['Kfold']), np.std(df['Kfold']))
-    df['norm'] = norm.pdf(df['Kfold'], np.mean(df['Kfold']), np.std(df['Kfold']))
-
+    
     fig = go.Figure()
     # legend the data "experimental data"
     fig.add_trace(
@@ -1135,8 +1084,6 @@ def kfold_per_family(study, sample, family):
             size=18
         )
     )
-    
-        
 
     # show the mean in the x axis
     fig.add_annotation(
@@ -1158,7 +1105,7 @@ def kfold_per_family(study, sample, family):
 
     fig.update_layout(
         title='Kfold distribution for sample {} and family {}'.format(sample, family),
-        xaxis_title='Kfold',
+        xaxis_title='Kfold' if stride == 'turner' else 'child number',
         yaxis_title='Probability density',
         legend_title='Legend',
         font=dict(
@@ -1166,8 +1113,45 @@ def kfold_per_family(study, sample, family):
         )
     )
 
+    if stride == 'child#':
+        df.rename(columns={'Kfold': 'child#'}, inplace=True)
+
     return {'fig': fig, 'data': df}
 
+
+def kfold_per_samples(study, samples, family, stride='turner'):
+
+    assert stride in ['turner', 'child#'], 'stride must be either "turner" or "child#"'
+
+    data = {}
+    for sample in samples:
+        data[sample] = {}
+        for family in study.df[study.df['sample']==sample].family.unique():
+            df = generate_dataset.compute_k_fold_fit(study, sample, family, stride)
+            data[sample][family] = df['Kfold'].mean()
+    
+    df = pd.DataFrame(data)
+
+    # build a barplot of the Kfold values
+    fig = go.Figure()
+    for sample in samples:
+        fig.add_trace(go.Bar(x=df.index, y=df[sample], name=sample))
+    fig.update_layout(
+        title='Kfold Turner-based estimation for {}'.format(' and '.join(samples)) if stride == 'turner' else 'Kfold child-number-based estimation for {}'.format(' and '.join(samples)),
+        xaxis_title='Family',
+        yaxis_title='Kfold' if stride == 'turner' else 'child number',
+        bargap=0.2,
+        bargroupgap=0.1
+    )
+
+    # reverse the y axis
+    if stride == 'turner':
+        fig.update_yaxes(autorange="reversed")
+        
+    elif stride == 'child#':
+        df.rename(columns={'Kfold': 'child#'}, inplace=True)
+
+    return {'fig': fig, 'data': df}
 
 
 # ---------------------------------------------------------------------------
