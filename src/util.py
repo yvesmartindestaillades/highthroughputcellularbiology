@@ -19,20 +19,26 @@ def fasta_to_df(fasta_file):
     seqs = [l for l in lines if not l.startswith('>')]
     return pd.DataFrame({'construct': names, 'sequence': seqs})
 
-def save_plotly_fig(cwd, filename, fig):
+def save_plotly_fig(cwd, filename, fig, format='html'):
     """Save a plotly figure and create the directory if it doesn't exists.
 
     Args:
         cwd: directory
         filename: name of the html file
         fig: plotly figure
+        format: format of the file, either 'html' or 'png'. Default is 'html'
     """
 
     cwd = os.path.normpath(cwd)
     path = os.path.join('..','..', 'figs', cwd.split('/')[-2], cwd.split('/')[-1].split('-')[0], *(version+'-'+filename).split('/')[:-1])
     path = make_path(path)
 
-    fig.write_html(path+(version+'-'+filename).split('/')[-1]+'.html', full_html=True)
+    if format == 'png':
+        fig.write_image(path+(version+'-'+filename).split('/')[-1]+'.png')
+    elif format == 'html':
+        fig.write_html(path+(version+'-'+filename).split('/')[-1]+'.html', full_html=True)
+    else:
+        raise ValueError('format must be either html or png')
 
 def savefig(file:str, close=True)->None:
     """Save a matplotlib figure and create the directory if it doesn't exists.
