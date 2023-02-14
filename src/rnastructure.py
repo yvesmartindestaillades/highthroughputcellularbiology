@@ -89,6 +89,6 @@ class RNAstructure(object):
 
 if __name__ == "__main__":
     rna = RNAstructure('/Users/ymdt/src/RNAstructure/exe')
-    rna.fit(sequence='GCATATGAGGATCACCCATATGC')
+    rna.fit(sequence='AAGATATTCGAAAGAATATCTT')
     print("DeltaG + structure:", rna.predict_construct_deltaG())
     print("Ens. energy:", rna.predict_ensemble_energy())

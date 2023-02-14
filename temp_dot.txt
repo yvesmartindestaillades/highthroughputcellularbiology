@@ -1,0 +1,3 @@
+>ENERGY = -8.4  construct
+AAGATATTCGAAAGAATATCTT
+(((((((((....)))))))))

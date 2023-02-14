@@ -200,3 +200,9 @@ def compute_wilson_interval(p, n, z = 1.96):
     lower_bound = (centre_adjusted_probability - z*adjusted_standard_deviation) / denominator
     upper_bound = (centre_adjusted_probability + z*adjusted_standard_deviation) / denominator
     return (lower_bound, upper_bound)
+
+
+def family_from_construct(construct):
+    return construct.split('=')[1].split('-')[0]
+
+

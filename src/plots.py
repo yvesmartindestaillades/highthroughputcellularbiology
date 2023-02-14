@@ -91,7 +91,7 @@ def _mutations_per_read_subplot(study, sample):
     bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
 
-def mutations_per_read(study, unique_samples):
+def mutations_per_read_per_sample(study, unique_samples):
     if not isinstance(unique_samples, list) and not isinstance(unique_samples, tuple) and not isinstance(unique_samples, np.ndarray) and not isinstance(unique_samples, set):
         unique_samples = [unique_samples]
         
@@ -106,6 +106,24 @@ def mutations_per_read(study, unique_samples):
     return {
         'fig':fig,
         'data':study.df[study.df['section']=='full'][['sample','construct','num_of_mutations']]
+        }
+    
+def mutation_per_read_per_construct(study, sample, construct):
+    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+    if len(data) == 0:
+        return None
+    data = data.iloc[0]
+    MAX_MUTATIONS = 20
+    # normalize by the number of reads
+    fig = px.bar(x=np.arange(0,MAX_MUTATIONS), y=data[:MAX_MUTATIONS])
+
+    fig.update_layout(barmode='stack')
+    fig.update_layout(title='Number of mutations per read - {} - {}'.format(sample, construct))
+    fig.update_yaxes(title='Count')
+    fig.update_xaxes(title='Number of mutations per read')
+    return {
+        'fig':fig,
+        'data':data
         }
 
 def _mutation_identity_at_each_position_subplot(study, sample, construct, section='full'):
@@ -839,11 +857,10 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
                 labels=dict(x='Sample {}'.format(samples[1]), y='Sample {}'.format(samples[0])),
                 width=800,
                 height=800,
-                text_auto = '.2f'
+                text_auto = '.2f',
                 )
-    fig.show() 
     
-    return {'data': data, 'fig': fig}
+    return {'data': df, 'fig': fig}
 
 
 def biological_replicates_histogram(study, bio_replicates_samples):

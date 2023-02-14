@@ -167,3 +167,18 @@ def compute_k_fold_fit(study, sample, family, stride='turner'):
     
     return df
     
+    
+def compute_quality_score_construct_vs_family(study, sample, family, metric='pearson'):
+    
+    # Get the data
+    data = study.get_df(sample=sample, family=family, section='ROI')
+    
+    def align_shifted_vectors(v1, s1, v2, s2):
+        """Align two vectors with a given shift"""
+        if s1 < s2:
+            s2, s1 = s1, s2
+        shift = s1 - s2
+        assert len(v1) >= len(v2) + shift, 'Vectors cannot be aligned'
+        return v1[shift:len(v2)+shift], v2
+    
+    
