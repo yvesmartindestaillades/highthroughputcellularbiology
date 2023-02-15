@@ -1167,6 +1167,126 @@ def heatmap_across_family_members(study, sample):
     plt.ylabel('Construct')
     """
 
+def mut_rates_for_kfold(study, samples, family, stride = 'turner'):
+    
+    assert stride in ['turner', 'child#'], 'stride must be either "turner" or "child#"'
+    
+    if isinstance(samples, str):
+        samples = [samples]
+    
+    df = {}
+    for sample in samples:
+        df[sample] = generate_dataset.select_data_for_kfold(study, sample, family, stride)
+    
+    df = pd.concat(df, axis=0).reset_index().rename(columns={'level_0': 'sample', 'level_1': 'deltaG'})
+    
+    # Make affine transformation to have the same scale for all samples
+    affine_tranformations = generate_dataset.compute_affine_transformation_for_replicates(study, samples)
+    
+    for sample in samples[1:]:
+        for col in df.columns[2:]:
+            df.loc[df['sample']==sample, col] = affine_tranformations[sample](df[df['sample']==sample][col].values)
+
+    fig = go.Figure()
+    
+    # Function to fit
+    def sigmoid(x, a, b, c):
+        RT = 1.987204258*310/1000
+        return a / (1 + b*np.exp(-x/RT)) + c
+    
+    # Make a color generator for the different samples
+    colors = {}
+    for i, sample in enumerate(samples):
+        colors[sample] = px.colors.qualitative.Plotly[i]
+
+    visible_list = []
+
+    for sample in samples:
+        for base in df.columns[2:]:
+            x, y = df[df['sample']==sample]['deltaG'].values, df[df['sample']==sample][base].values
+            # remove nans
+            x, y = x[~np.isnan(y)], y[~np.isnan(y)]
+            
+            fig.add_trace(go.Scatter(
+                x=x,
+                y=y,
+                mode='markers',
+                name=sample,
+                marker=dict(size=10),
+                line=dict(color=colors[sample], width=2),
+                legendgroup=samples.index(sample),
+                visible=False,
+            ))
+            visible_list.append(base)
+            # fit the data
+            try:
+                popt, pcov = curve_fit(sigmoid, x, y, p0=[0.04, 0.02, 0.00], bounds=([0, 0, 0], [0.1, np.inf, 0.05]), max_nfev=1000)
+            except:
+                print('Could not fit data for sample {} and base {}'.format(sample, base))
+                print(x,y)
+                continue
+            x_fit = np.linspace(x.min(), x.max(), 100)
+            y_fit = sigmoid(x_fit, *popt)
+            
+            # plot the fit
+            fig.add_trace(go.Scatter(
+                x=x_fit,
+                y=y_fit,
+                mode='lines',
+                name=sample,
+                showlegend=False,
+                line=dict(color=colors[sample], width=2),
+                legendgroup=samples.index(sample),
+                visible=False,
+            ))
+            visible_list.append(base)
+            
+            # draw a vertical line 
+
+    # add title
+    fig.update_layout(
+        title_text="Mutation rates for bases used in kfold across samples",
+        xaxis_title="deltaG",
+        yaxis_title="mutation rate (corrected)",
+        legend_title_text='Samples')
+
+    # increase title and labels font size 
+    fig.update_layout(title_font_size=20)
+    fig.update_layout(xaxis_title_font_size=16)
+    fig.update_layout(yaxis_title_font_size=16)
+
+    # window y to 0-0.15
+    fig.update_yaxes(range=[0, 0.15])
+    
+    # add a button to select a single base to display
+    fig.update_layout(
+        updatemenus=[
+            go.layout.Updatemenu(
+                active=0,
+                buttons=list([
+                    dict(label = base,
+                         method = 'update',
+                         args = [{'visible': [True if base in visible_list[i] else False for i in range(len(visible_list))]},
+                                 {'title': 'Mutation rates for base {} of family {} across {}'.format(base, family, samples)}])
+                    for j, base in enumerate(df.columns[2:])
+                ]),
+                direction = 'down',
+                pad = {'r': 10, 't': 10},
+                showactive = True,
+                x = 0.1,
+                xanchor = 'left',
+                y = 1,
+                yanchor = 'top'
+                
+            )
+        ])
+
+    # make the first base visible
+    for i, b in enumerate(visible_list):
+        fig.data[i].visible = b == df.columns[2]
+        
+
+    return {'data': df, 'fig': fig}
 
 def kfold_per_family(study, sample, family, stride = 'turner'):
     

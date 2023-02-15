@@ -1,6 +1,6 @@
 import scipy.stats
 import numpy as np
-from util import findall, custom_pearsonr
+from util import findall, custom_pearsonr, compute_affine_transformation
 import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import norm
@@ -70,21 +70,7 @@ def find_frame_shift_ROI(study):
     return df
 
 
-def compute_k_fold_fit(study, sample, family, stride='turner'):
-    """Compute the K-fold fit for a given sample and family
-    
-    Parameters
-    ----------
-    study : Study
-        Study object
-    sample : str
-        Sample name
-    family : str
-        Family name
-    stride : str, optional
-        Stride to use for the fit, by default 'turner'. Can be 'turner' or 'child#'.
-        
-    """
+def select_data_for_kfold(study, sample, family, stride='turner'):
     
     data = study.get_df(sample=sample, family=family, section='ROI') #TODO remove unpaired bases
 
@@ -122,6 +108,26 @@ def compute_k_fold_fit(study, sample, family, stride='turner'):
             df.loc[row.index, 'child#'] = idx
         
         df.set_index('child#', inplace=True)
+
+    return df
+
+def compute_k_fold_fit(study, sample, family, stride='turner'):
+    """Compute the K-fold fit for a given sample and family
+    
+    Parameters
+    ----------
+    study : Study
+        Study object
+    sample : str
+        Sample name
+    family : str
+        Family name
+    stride : str, optional
+        Stride to use for the fit, by default 'turner'. Can be 'turner' or 'child#'.
+        
+    """
+
+    df = select_data_for_kfold(study, sample, family, stride=stride)    
 
     # Function to fit
     def sigmoid(x, a, b, c):
@@ -180,5 +186,33 @@ def compute_quality_score_construct_vs_family(study, sample, family, metric='pea
         shift = s1 - s2
         assert len(v1) >= len(v2) + shift, 'Vectors cannot be aligned'
         return v1[shift:len(v2)+shift], v2
+    
+
+def compute_affine_transformation_for_replicates(study, samples):
+    """Compare the mutation rates distribution, align them and compute the affine transformation
+    
+    Parameters
+    ----------
+    study : Study
+        Study object
+    samples : list
+        List of sample names. First sample is used as reference.
+    """
+    df = study.get_df(sample=samples, section='ROI', base_type=['A','C'])
+    
+    # remove the construct that are not in all samples
+    df = df.groupby('construct').filter(lambda x: len(x['sample'].unique()) == len(samples))
+    
+    data = {}
+    for sample in samples:
+        data[sample] = np.concatenate(df[df['sample']==sample]['mut_rates'].values).reshape(-1, 1)
+    
+    # Compute the linear transformation with the first sample as reference
+    ref = data[samples[0]]
+    lin_trans = {}
+    for sample in samples[1:]:
+        lin_trans[sample] = compute_affine_transformation(data[sample], ref)
+    
+    return lin_trans
     
     

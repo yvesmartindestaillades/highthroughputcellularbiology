@@ -72,7 +72,6 @@ class RNAstructure(object):
         temp_dot = open(self.dot_file, 'r')
         first_line = temp_dot.readline().split()
         # If only dots in the structure, no deltaG 
-        out = {}
         print('first_line',first_line)
         if len(first_line) == 4:
             _, _, deltaG, _ = first_line

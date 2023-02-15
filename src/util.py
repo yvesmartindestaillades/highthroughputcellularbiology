@@ -211,4 +211,13 @@ def compute_wilson_interval(p, n, z = 1.96):
 def family_from_construct(construct):
     return construct.split('=')[1].split('-')[0]
 
-
+def compute_affine_transformation(s1, s2):
+    """Compute the affine transformation that aligns s1 to s2.
+    Returns the y = mx + c transformation.
+    """
+    s1 = np.array(s1)
+    s2 = np.array(s2)
+    model = LinearRegression()
+    model.fit(s1, s2)
+    # ignore nan values
+    return lambda x: x*model.coef_[0][0] + model.intercept_[0]
