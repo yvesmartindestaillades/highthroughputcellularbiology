@@ -11,6 +11,7 @@ def run_command(cmd):
 class RNAstructure(object): 
     def __init__(self, rnastructure_path) -> None:
         self.rnastructure_path = rnastructure_path if rnastructure_path[-1] == '/' else rnastructure_path+'/'
+        self.directory = 'temp/rnastructure/'
 
     def fit(self, sequence, construct='construct'):
         self.sequence = sequence
@@ -41,25 +42,23 @@ class RNAstructure(object):
         return self.__cast_pairing_prob(out)
 
     def predict_construct_deltaG(self):
-        # Run RNAstructure
         cmd = f"{self.rnastructure_path}Fold {self.fasta_file} {self.ct_file}"
         run_command(cmd)
         assert os.path.getsize(self.ct_file) != 0, f"{self.ct_file} is empty, check that RNAstructure works"
         return self.__extract_deltaG_struct()
 
     def __make_temp_folder(self):
-        temp_folder = 'temp/rnastructure/'
-        isExist = os.path.exists(temp_folder)
+        isExist = os.path.exists(self.directory)
         if not isExist:
-            os.makedirs(temp_folder)
-        return temp_folder
+            os.makedirs(self.directory)
+        return self.directory
 
     def __make_files(self, temp_prefix='temp'):
-        self.pfs_file = f"{temp_prefix}.pfs"
-        self.ct_file = f"{temp_prefix}.ct"
-        self.dot_file = f"{temp_prefix}_dot.txt"
-        self.fasta_file = temp_prefix+'.fasta'
-        self.prob_file = temp_prefix+'_prob.txt'
+        self.pfs_file = f"{self.directory}/{temp_prefix}.pfs"
+        self.ct_file = f"{self.directory}/{temp_prefix}.ct"
+        self.dot_file = f"{self.directory}/{temp_prefix}_dot.txt"
+        self.fasta_file = self.directory+'/'+temp_prefix+'.fasta'
+        self.prob_file = self.directory+'/'+temp_prefix+'_prob.txt'
 
     def __create_fasta_file(self, construct, sequence):
         # push the ref into a temp file
@@ -74,21 +73,32 @@ class RNAstructure(object):
         first_line = temp_dot.readline().split()
         # If only dots in the structure, no deltaG 
         out = {}
+        print('first_line',first_line)
         if len(first_line) == 4:
             _, _, deltaG, _ = first_line
             deltaG = float(deltaG)
         if len(first_line) == 1:
-            deltaG, _ = 'void', first_line[0][1:]
+            deltaG, _ = 0.0, first_line[0][1:]
 
         sequence = temp_dot.readline()[:-1] #  Remove the \n
         structure = temp_dot.readline()[:-1] # Remove the \n
         return deltaG, structure
 
-    def run(self, samp, mh):
-        return
+    def run(self, sequence):
+        if os.path.exists(os.path.join(self.directory, sequence+'.txt')):
+            # read from file
+            with open(os.path.join(self.directory, sequence+'.txt'), 'r') as f:
+                deltaG, structure = f.readline().split()
+        else:
+            self.fit(sequence)
+            deltaG, structure = self.predict_construct_deltaG()
+            with open(os.path.join(self.directory, sequence+'.txt'), 'w') as f:
+                f.write(f"{deltaG} {structure}")
+        return deltaG, structure
 
 if __name__ == "__main__":
     rna = RNAstructure('/Users/ymdt/src/RNAstructure/exe')
     rna.fit(sequence='AAGATATTCGAAAGAATATCTT')
     print("DeltaG + structure:", rna.predict_construct_deltaG())
     print("Ens. energy:", rna.predict_ensemble_energy())
+    print("One line command:", rna.run('AAGATATTCGAAAGAATATCTT'))
