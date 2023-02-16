@@ -464,17 +464,14 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
     data = study.get_df(
             sample = sample, 
-            section = 'full',
-            base_type = ['A','C'])[['sample','construct','section','mut_rates']]
+            section = 'full')[['sample','construct','section','mut_rates','sequence']]
     
-    def assert_length(x, length):
-        assert len(x) == length, 'The length of the barcode is not the same: {} vs {}'.format(len(x), length)
-        return x
-    
-    data['mut_rates'] = data['mut_rates'].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
-    
-    data['mut_rates'] = data['mut_rates'].apply(lambda x: assert_length(x, 170-12))
 
+    for col in ['mut_rates','sequence']:
+        data[col] = data[col].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
+    
+    data['mut_rates'] = data.apply(lambda x: np.array([x['mut_rates'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']]), axis=1)    
+    
     showed_pairs = []
     uniquepairs = []
     for construct, replicates in replicates_lists.items():
@@ -492,7 +489,7 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
                     y = y, 
                     mode = 'markers',
                     name = 'mutation rates',#' '.join([construct, replicate]),
-                    visible=True,
+                    visible=False,
                         
                 ))
                 showed_pairs.append((construct, replicate))
@@ -1548,6 +1545,7 @@ def __corr_scatter_plot(x, y, visible=True):
             mode = 'text',
             text = ['Pearson correlation score: {:.2f}'.format(custom_pearsonr(x,y))],
             textposition = 'top center',
+            showlegend=False,
             visible=visible
         ))
     
@@ -1559,6 +1557,7 @@ def __corr_scatter_plot(x, y, visible=True):
             mode = 'text',
             text = ['R2 score: {:.2f}'.format(r2)],
             textposition = 'bottom center',
+            showlegend=False,
             visible=visible
         ))
     
