@@ -7,8 +7,8 @@ from rnastructure import *
 
 # Load df and add family and flank
 df = fasta_to_df('data/reference.fasta')
-df['family'] = df['construct'].apply(lambda s: s.split('_')[1].split('-')[0].split('=')[1])
-df['flank'] = df['construct'].apply(lambda s: s.split('-')[2].split('=')[0])
+df['family'] = df['reference'].apply(lambda s: s.split('_')[1].split('-')[0].split('=')[1])
+df['flank'] = df['reference'].apply(lambda s: s.split('-')[2].split('=')[0])
         
 # add section and name_section
 df_out = pd.DataFrame()
@@ -34,7 +34,7 @@ df['sequence'] = df.apply(lambda x: x['sequence'][x['section_start']-1:x['sectio
 
 for sequence, g in tqdm(df.groupby('sequence')):
     rna.fit(sequence=sequence)
-    deltaG, structure = rna.predict_construct_deltaG()
+    deltaG, structure = rna.predict_reference_deltaG()
     df.loc[g.index, 'deltaG'] = deltaG
     df.loc[g.index, 'structure'] = structure
     

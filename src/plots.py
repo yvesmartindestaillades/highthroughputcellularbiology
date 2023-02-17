@@ -67,14 +67,14 @@ def mutations_in_barcodes(study):
                 )
             ])
     
-    return {'fig': fig, 'data': data[['sample','construct','num_of_mutations']]}
+    return {'fig': fig, 'data': data[['sample','reference','num_of_mutations']]}
 
-def num_aligned_reads_per_construct_frequency_distribution(study, sample):
+def num_aligned_reads_per_reference_frequency_distribution(study, sample):
     num_aligned_reads = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_aligned'].to_list()
 
     return go.Histogram(x=num_aligned_reads, showlegend=False, marker_color='indianred')
 
-def num_aligned_reads_per_construct(study, sample):
+def num_aligned_reads_per_reference(study, sample):
     num_aligned_reads = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_aligned'].to_list()
     num_aligned_reads.sort()
     num_aligned_reads.reverse()
@@ -105,11 +105,11 @@ def mutations_per_read_per_sample(study, unique_samples):
     fig.update_layout(autosize=True, height=len(unique_samples)*500, title='Number of mutation per read across samples')
     return {
         'fig':fig,
-        'data':study.df[study.df['section']=='full'][['sample','construct','num_of_mutations']]
+        'data':study.df[study.df['section']=='full'][['sample','reference','num_of_mutations']]
         }
     
-def mutation_per_read_per_construct(study, sample, construct):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+def mutation_per_read_per_reference(study, sample, reference):
+    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
     if len(data) == 0:
         return None
     data = data.iloc[0]
@@ -118,7 +118,7 @@ def mutation_per_read_per_construct(study, sample, construct):
     fig = px.bar(x=np.arange(0,MAX_MUTATIONS), y=data[:MAX_MUTATIONS])
 
     fig.update_layout(barmode='stack')
-    fig.update_layout(title='Number of mutations per read - {} - {}'.format(sample, construct))
+    fig.update_layout(title='Number of mutations per read - {} - {}'.format(sample, reference))
     fig.update_yaxes(title='Count')
     fig.update_xaxes(title='Number of mutations per read')
     return {
@@ -126,8 +126,8 @@ def mutation_per_read_per_construct(study, sample, construct):
         'data':data
         }
 
-def _mutation_identity_at_each_position_subplot(study, sample, construct, section='full'):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)].iloc[0]
+def _mutation_identity_at_each_position_subplot(study, sample, reference, section='full'):
+    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference) & (study.df['section']==section)].iloc[0]
     df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
@@ -153,16 +153,16 @@ def _mutation_identity_at_each_position_subplot(study, sample, construct, sectio
         
     return {'fig':stacked_bar, 'data':df}
 
-def mutation_identity_at_each_position(study, sample, unique_constructs, section='full'):
+def mutation_identity_at_each_position(study, sample, unique_references, section='full'):
 
-    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
-        unique_constructs = [unique_constructs]
+    if not isinstance(unique_references, list) and not isinstance(unique_references, tuple)  and not isinstance(unique_references, np.ndarray)  and not isinstance(unique_references, set):
+        unique_references = [unique_references]
     
-    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
-                    subplot_titles=['Mutation identity at each position - {} - {} reads'.format(cst, reads) for cst, reads in zip(unique_constructs, study.df[(study.df['sample']==sample)&(study.df['construct'].isin(unique_constructs))&(study.df['section']=='full')]['num_aligned'])])
+    fig = make_subplots(rows=len(unique_references), cols=1, vertical_spacing=0.2/len(unique_references),
+                    subplot_titles=['Mutation identity at each position - {} - {} reads'.format(cst, reads) for cst, reads in zip(unique_references, study.df[(study.df['sample']==sample)&(study.df['reference'].isin(unique_references))&(study.df['section']=='full')]['num_aligned'])])
     
-    for i_c, construct in enumerate(unique_constructs):
-        muts_identity = _mutation_identity_at_each_position_subplot(study, sample, construct, section)
+    for i_c, reference in enumerate(unique_references):
+        muts_identity = _mutation_identity_at_each_position_subplot(study, sample, reference, section)
 
         for bar in muts_identity['fig']:
             fig.add_trace( bar, row=i_c+1, col=1 )
@@ -176,25 +176,25 @@ def mutation_identity_at_each_position(study, sample, unique_constructs, section
         trace["name"] = name
 
     fig.update_yaxes(title='Mutation fraction')
-    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1500)
+    fig.update_layout(barmode='stack', height=500*len(unique_references), width=1500)
     plot = {
         'fig':fig,
         'data':study.df[
             (study.df['sample']==sample)&
-            (study.df['construct'].isin(unique_constructs))&
+            (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','construct','mod_bases_A','mod_bases_C','mod_bases_G','mod_bases_T','num_aligned']]
+        [['sample','reference','mod_bases_A','mod_bases_C','mod_bases_G','mod_bases_T','num_aligned']]
         }
     return plot
 
  
-def _mutation_fraction_at_each_position_subplot(study, sample, construct, section='full'):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct) & (study.df['section']==section)]
+def _mutation_fraction_at_each_position_subplot(study, sample, reference, section='full'):
+    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference) & (study.df['section']==section)]
     
     if len(data) >= 1:
         data = data.iloc[0]
     else:
-        print('No data for sample {} construct {} section {}'.format(sample, construct, section))
+        print('No data for sample {} reference {} section {}'.format(sample, reference, section))
         return {'fig':[], 'data':[]}
     
     df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
@@ -217,15 +217,15 @@ def _mutation_fraction_at_each_position_subplot(study, sample, construct, sectio
     
     return {'fig': stacked_bar, 'data': df}
 
-def mutation_fraction_at_each_position(study, sample, unique_constructs, section='full'):
+def mutation_fraction_at_each_position(study, sample, unique_references, section='full'):
 
-    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
-        unique_constructs = [unique_constructs]
+    if not isinstance(unique_references, list) and not isinstance(unique_references, tuple)  and not isinstance(unique_references, np.ndarray)  and not isinstance(unique_references, set):
+        unique_references = [unique_references]
 
-    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
-                        subplot_titles=['Mutation fraction at each position - {}'.format(cst) for cst in unique_constructs])
-    for i_c, construct in enumerate(unique_constructs):
-        muts_identity = _mutation_fraction_at_each_position_subplot(study, sample, construct, section)
+    fig = make_subplots(rows=len(unique_references), cols=1, vertical_spacing=0.2/len(unique_references),
+                        subplot_titles=['Mutation fraction at each position - {}'.format(cst) for cst in unique_references])
+    for i_c, reference in enumerate(unique_references):
+        muts_identity = _mutation_fraction_at_each_position_subplot(study, sample, reference, section)
 
         if len(muts_identity['fig']) == 0:
             continue
@@ -242,22 +242,22 @@ def mutation_fraction_at_each_position(study, sample, unique_constructs, section
         trace["name"] = name
 
     fig.update_yaxes(title='Mutation fraction')
-    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1500)
+    fig.update_layout(barmode='stack', height=500*len(unique_references), width=1500)
     plot = {
         'fig':fig,
         'data':study.df[
             (study.df['sample']==sample)&
-            (study.df['construct'].isin(unique_constructs))&
+            (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','construct','mut_rates','num_aligned']]
+        [['sample','reference','mut_rates','num_aligned']]
         }
     
     return plot
 
 
 
-def _read_coverage_per_position_subplot(study, sample, construct):
-    data = study.df[(study.df['sample']==sample) & (study.df['construct']==construct)]
+def _read_coverage_per_position_subplot(study, sample, reference):
+    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference)]
     sections, section_start, section_end = data['section'].unique(), data['section_start'].unique(), data['section_end'].unique()
     idx = np.argsort(section_start)
     sections, section_start, section_end = sections[idx], section_start[idx], section_end[idx]
@@ -277,16 +277,16 @@ def _read_coverage_per_position_subplot(study, sample, construct):
     data['section'] = sections
     return {'fig': scatters, 'data': data}
 
-def read_coverage_per_position(study, sample, unique_constructs):
+def read_coverage_per_position(study, sample, unique_references):
     
-    if not isinstance(unique_constructs, list) and not isinstance(unique_constructs, tuple)  and not isinstance(unique_constructs, np.ndarray)  and not isinstance(unique_constructs, set):
-        unique_constructs = [unique_constructs]
+    if not isinstance(unique_references, list) and not isinstance(unique_references, tuple)  and not isinstance(unique_references, np.ndarray)  and not isinstance(unique_references, set):
+        unique_references = [unique_references]
 
-    fig = make_subplots(rows=len(unique_constructs), cols=1, vertical_spacing=0.2/len(unique_constructs),
-                        subplot_titles=['Read coverage per position - {}'.format(cst) for cst in unique_constructs])
+    fig = make_subplots(rows=len(unique_references), cols=1, vertical_spacing=0.2/len(unique_references),
+                        subplot_titles=['Read coverage per position - {}'.format(cst) for cst in unique_references])
     
-    for i_c, construct in enumerate(unique_constructs):
-        read_coverage = _read_coverage_per_position_subplot(study, sample, construct)
+    for i_c, reference in enumerate(unique_references):
+        read_coverage = _read_coverage_per_position_subplot(study, sample, reference)
 
         for bar in read_coverage['fig']:
             fig.add_trace( bar, row=i_c+1, col=1 )
@@ -297,14 +297,14 @@ def read_coverage_per_position(study, sample, unique_constructs):
         trace["name"] = name
 
     fig.update_yaxes(title='Read coverage')
-    fig.update_layout(barmode='stack', height=500*len(unique_constructs), width=1300)
+    fig.update_layout(barmode='stack', height=500*len(unique_references), width=1300)
     plot = {
         'fig':fig,
         'data':study.df[
             (study.df['sample']==sample)&
-            (study.df['construct'].isin(unique_constructs))&
+            (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','construct','cov_bases']]
+        [['sample','reference','cov_bases']]
         }
 
     return plot
@@ -369,17 +369,17 @@ def replicates_fisher_pearson_decorator(function):
             
             return pvalue
 
-        for construct, replicates in replicates_lists.items():
+        for reference, replicates in replicates_lists.items():
             for replicate in replicates:
-                if construct not in data['construct'].values or replicate not in data['construct'].values:
-                    print('Construct or replicate not found in the data: {} {}'.format(construct, replicate))
+                if reference not in data['reference'].values or replicate not in data['reference'].values:
+                    print('reference or replicate not found in the data: {} {}'.format(reference, replicate))
                     continue
                 
                 # using the true data
-                n1 = data[data['construct'] == construct]['num_aligned'].values[0]
-                n2 = data[data['construct'] == replicate]['num_aligned'].values[0]
-                mr1 = data[data['construct'] == construct]['mut_rates'].values[0]
-                mr2 = data[data['construct'] == replicate]['mut_rates'].values[0]
+                n1 = data[data['reference'] == reference]['num_aligned'].values[0]
+                n2 = data[data['reference'] == replicate]['num_aligned'].values[0]
+                mr1 = data[data['reference'] == reference]['mut_rates'].values[0]
+                mr2 = data[data['reference'] == replicate]['mut_rates'].values[0]
 
                 p_values_true_data.append(fisher_compute_and_combine_pvalues(n1, mr1, n2, mr2))
                 pearsonr_true_data.append(stats.pearsonr(mr1, mr2)[0])
@@ -407,7 +407,7 @@ def replicates_fisher_pearson_decorator(function):
 
         fig['layout']['title'] = title
         fig['layout']['xaxis']['title']= 'Pearson correlation'
-        fig['layout']['xaxis2']['title']='p-value of the Fisher exact test per residue, combined per construct with the Fisher method'
+        fig['layout']['xaxis2']['title']='p-value of the Fisher exact test per residue, combined per reference with the Fisher method'
         fig['layout']['yaxis']['title']='Percent'
         fig['layout']['yaxis2']['title']='Percent'
         
@@ -418,7 +418,7 @@ def replicates_fisher_pearson_decorator(function):
 @replicates_fisher_pearson_decorator
 def barcodes_replicates_fisher_pearson(study, sample):
     replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
-    data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'full')][['sample','construct','section','mut_rates','num_aligned','sequence']]
+    data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'full')][['sample','reference','section','mut_rates','num_aligned','sequence']]
     barcode_bounds = [139,151]
 
     for col in ['mut_rates','sequence']:
@@ -430,11 +430,11 @@ def barcodes_replicates_fisher_pearson(study, sample):
 
 @replicates_fisher_pearson_decorator
 def biological_replicates_fisher_pearson(study, sample):
-    data = study.df[(study.df['sample'].isin(sample)) & (study.df['section'] == 'full')][['sample','construct','section','mut_rates','num_aligned','sequence']]
+    data = study.df[(study.df['sample'].isin(sample)) & (study.df['section'] == 'full')][['sample','reference','section','mut_rates','num_aligned','sequence']]
     if sample[0] != sample[1]:
-        data = data.groupby('construct').filter(lambda x: len(x) == 2)
-    replicates_lists = {construct+'_'+sample[0]: [construct+'_'+sample[1]] for construct in data['construct'].unique()}
-    data['construct'] = data.apply(lambda x: x['construct'] + '_' + x['sample'], axis=1)
+        data = data.groupby('reference').filter(lambda x: len(x) == 2)
+    replicates_lists = {reference+'_'+sample[0]: [reference+'_'+sample[1]] for reference in data['reference'].unique()}
+    data['reference'] = data.apply(lambda x: x['reference'] + '_' + x['sample'], axis=1)
     
     title = 'Similarity test between biological replicates using Pearson correlation and Fisher exact test for samples {} and {}'.format(sample[0], sample[1])
     
@@ -451,7 +451,7 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
     A scatter plot is generated for each section in SECTION_TO_COMPARE_FOR_BARCODE_REPLICATES
     A line is drawn for the mean of the replicates
-    A button is added to the plot to select other constructs and other replicates in study.df
+    A button is added to the plot to select other references and other replicates in study.df
     
     """
     
@@ -464,7 +464,7 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
     data = study.get_df(
             sample = sample, 
-            section = 'full')[['sample','construct','section','mut_rates','sequence']]
+            section = 'full')[['sample','reference','section','mut_rates','sequence']]
     
 
     for col in ['mut_rates','sequence']:
@@ -474,13 +474,13 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
     showed_pairs = []
     uniquepairs = []
-    for construct, replicates in replicates_lists.items():
+    for reference, replicates in replicates_lists.items():
         for replicate in replicates:
-            if not (replicate, construct) in showed_pairs:
+            if not (replicate, reference) in showed_pairs:
                 
-                uniquepairs.append((construct, replicate))
-                x = data[data['construct']==construct]['mut_rates'].values[0]
-                y = data[data['construct']==replicate]['mut_rates'].values[0]
+                uniquepairs.append((reference, replicate))
+                x = data[data['reference']==reference]['mut_rates'].values[0]
+                y = data[data['reference']==replicate]['mut_rates'].values[0]
                 
                 assert len(x) == len(y), 'The length of the two replicates are not the same: {} vs {}'.format(len(x), len(y))
 
@@ -488,42 +488,42 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
                     x = x,
                     y = y, 
                     mode = 'markers',
-                    name = 'mutation rates',#' '.join([construct, replicate]),
+                    name = 'mutation rates',#' '.join([reference, replicate]),
                     visible=False,
                         
                 ))
-                showed_pairs.append((construct, replicate))
+                showed_pairs.append((reference, replicate))
                     
                 for trace in __corr_scatter_plot(x, y, visible=False):
                     fig.add_trace(trace)
-                    showed_pairs.append((construct, replicate))
+                    showed_pairs.append((reference, replicate))
                 
                 fig.layout.update(
                     title = 'Barcode comparison - {} '.format(sample),
-                    xaxis_title = 'Barcode: {}'.format(construct),
+                    xaxis_title = 'Barcode: {}'.format(reference),
                     yaxis_title = 'Barcode: {}'.format(replicate),
                     showlegend = True,
                 )
 
                 
-    # Add dropdown menu to select construct and replicate
+    # Add dropdown menu to select reference and replicate
     fig.update_layout(
         updatemenus=[
             dict(
                 active=len(uniquepairs)-1,
                 buttons=list([
-                    dict(label = ' vs '.join([constructs[0], constructs[1]]),
+                    dict(label = ' vs '.join([references[0], references[1]]),
                             method = 'update',
                             args = [{
-                                'visible': [True if constructs == c else False for c in showed_pairs]},
-                                {'title': 'Barcode comparison - {} - {} vs {}'.format(sample, constructs[0], constructs[1]),
+                                'visible': [True if references == c else False for c in showed_pairs]},
+                                {'title': 'Barcode comparison - {} - {} vs {}'.format(sample, references[0], references[1]),
                                 'xaxis':
-                                    {'title': 'Barcode: {}'.format(constructs[0])},
+                                    {'title': 'Barcode: {}'.format(references[0])},
                                 'yaxis':
-                                    {'title': 'Barcode: {}'.format(constructs[1])},
+                                    {'title': 'Barcode: {}'.format(references[1])},
                                 }], 
                             )
-                    for constructs in uniquepairs
+                    for references in uniquepairs
                 ]),
             
             direction = 'down',
@@ -542,13 +542,13 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
 
     # activate the first trace
-    for i in range(10):
+    for i in range(5):
         fig.data[i].visible = True
         
     data = study.get_df(
             sample = sample, 
             section = 'full', 
-            base_type = ['A','C'])[['sample','construct','mut_rates']]
+            base_type = ['A','C'])[['sample','reference','mut_rates']]
     
     return {'fig': fig, 'data': data}
     
@@ -569,9 +569,9 @@ def combined_barcode_replicates_in_sample(study):
             y = data[sample]['scores'],
             name = sample,
             visible = False,
-            # add hover info to display the construct names from the list data[sample]['constructs']
-            hovertemplate='<b>Construct</b>: %{text}<br><b>Score</b>: %{y:.2f}<extra></extra>',
-            text = data[sample]['constructs'],
+            # add hover info to display the reference names from the list data[sample]['references']
+            hovertemplate='<b>reference</b>: %{text}<br><b>Score</b>: %{y:.2f}<extra></extra>',
+            text = data[sample]['references'],
             # remove the text in the bar
             textposition = 'none'
         ))
@@ -581,7 +581,7 @@ def combined_barcode_replicates_in_sample(study):
     
     fig.layout.update(
         title = 'Combined barcodes replicates - {}'.format(sample),
-        xaxis_title = 'Constructs',
+        xaxis_title = 'references',
         yaxis_title = 'Pearson correlation score average across barcode replicates'
     )
     
@@ -640,7 +640,7 @@ def barcode_replicates(study):
     
     fig.layout.update(
         title = 'Barcodes replicates - {}'.format(sample),
-        xaxis_title = 'Constructs',
+        xaxis_title = 'references',
         yaxis_title = 'Pearson correlation score average across barcode replicates'
     )
     
@@ -667,44 +667,44 @@ def barcode_replicates(study):
         )
     ]
     
-    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1').rename(columns={'constructs':'construct', 'scores':'score'})
+    data = pd.concat({sample:pd.DataFrame(data[sample]) for sample in data.keys()}).reset_index().rename(columns={'level_0':'sample'}).drop(columns='level_1').rename(columns={'references':'reference', 'scores':'score'})
 
     return {'fig': fig, 'data': data}
 
     
-def bio_replicates_per_construct(study, samples, family, correct_bias=False):
+def bio_replicates_per_reference(study, samples, family, correct_bias=False):
         
     fig = go.Figure()
 
-    unique_constructs = study.get_df(sample=samples, family=family)['construct'].unique()
+    unique_references = study.get_df(sample=samples, family=family)['reference'].unique()
 
     big_data = study.get_df(
         sample= samples,
-        construct = unique_constructs,
+        reference = unique_references,
         base_type = ['A','C'],
         section='full'
-        )[['sample','construct', 'mut_rates']]
+        )[['sample','reference', 'mut_rates']]
     
     if correct_bias:
         mut_rates = {}
         for sample in samples:
             mut_rates[sample] = big_data[big_data['sample']==sample]['mut_rates'].values[0]
     
-    for construct in unique_constructs:
+    for reference in unique_references:
         # add pearson correlation and r2 in big_data columns
-        data = big_data.loc[big_data['construct'] == construct]
+        data = big_data.loc[big_data['reference'] == reference]
         if len(data) == 2:
-            big_data.loc[big_data['construct'] == construct, 'pearson'] = custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
-            big_data.loc[big_data['construct'] == construct, 'r2'] = r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
+            big_data.loc[big_data['reference'] == reference, 'pearson'] = custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
+            big_data.loc[big_data['reference'] == reference, 'r2'] = r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
     
-    assert len(unique_constructs) > 0, 'No constructs found for the given samples and family'
+    assert len(unique_references) > 0, 'No references found for the given samples and family'
     
     trace_id = []
     
-    # For each construct plot three traces: the correlation line, the y=x line and the scatter plot
-    for i_c, construct in enumerate(unique_constructs):
+    # For each reference plot three traces: the correlation line, the y=x line and the scatter plot
+    for i_c, reference in enumerate(unique_references):
 
-        data = big_data.loc[big_data['construct'] == construct]
+        data = big_data.loc[big_data['reference'] == reference]
         
         if not len(data) == 2:
             continue
@@ -756,27 +756,27 @@ def bio_replicates_per_construct(study, samples, family, correct_bias=False):
         trace_id += [i_c]*5
         
     assert len(fig.data) > 0, 'No pairs found for the given samples and family'
-    # Show the three traces for the first construct
+    # Show the three traces for the first reference
     for i in range(5):
         fig.data[i].visible = True
 
-    # add a button to show/hide the traces for each construct
+    # add a button to show/hide the traces for each reference
     # the button should be on the right of the plot, outside of the plot
     fig.layout.updatemenus = [
         go.layout.Updatemenu(
             active = 0,
             buttons = [
                 dict(
-                    # show/hide the traces for the construct with the annotation
+                    # show/hide the traces for the reference with the annotation
                     args = [
                         {'visible': [True if i==j else False for i in trace_id]},
                         # update the title of the plot with r2 and pearson correlation
-                        {'title': '{} - {} - r2: {:.2f} - pearson: {:.2f}'.format(family, construct, big_data.loc[big_data['construct'] == construct]['r2'].iloc[0], big_data.loc[big_data['construct'] == construct]['pearson'].iloc[0])}
+                        {'title': '{} - {} - r2: {:.2f} - pearson: {:.2f}'.format(family, reference, big_data.loc[big_data['reference'] == reference]['r2'].iloc[0], big_data.loc[big_data['reference'] == reference]['pearson'].iloc[0])}
                         ],
 
-                    label = construct,
+                    label = reference,
                     method = 'update'
-                ) for j, construct in enumerate(unique_constructs)
+                ) for j, reference in enumerate(unique_references)
             ],
             direction = 'down',
             pad = {'r': 10, 't': 10},
@@ -815,7 +815,7 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             family=family, 
             base_type=['A','C'])
         
-        data = data[['sample','construct','section','mut_rates','sequence']]
+        data = data[['sample','reference','section','mut_rates','sequence']]
 
         
     if section == 'ROI':
@@ -825,7 +825,7 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             section=section, 
             family=family)
         
-        data = data[['sample','construct','section','mut_rates','frame_shift_ROI','sequence']]
+        data = data[['sample','reference','section','mut_rates','frame_shift_ROI','sequence']]
     
     if section == 'ROI':
         reference = data[data['sample'] == samples[0]].iloc[0]['sequence']
@@ -835,13 +835,13 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
     data_sample_1 = data[data['sample'] == samples[1]].reset_index(drop=True)
 
     df = pd.DataFrame(
-        index = data_sample_0['construct'],
-        columns = data_sample_1['construct'], 
+        index = data_sample_0['reference'],
+        columns = data_sample_1['reference'], 
     )
         
     for _, row in data_sample_0.iterrows():
         for _, row2 in data_sample_1.iterrows():
-            df.loc[row['construct'], row2['construct']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
+            df.loc[row['reference'], row2['reference']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
                                 
     fig = px.imshow(
                 df, 
@@ -867,9 +867,9 @@ def biological_replicates_histogram(study, bio_replicates_samples):
     for samples in bio_replicates_samples:
         data = {}
         for s in samples:
-            data[s] = study.df[(study.df['sample'] == s) & (study.df['section'] == 'full')][['sample','construct','mut_rates']].set_index('construct')
+            data[s] = study.df[(study.df['sample'] == s) & (study.df['section'] == 'full')][['sample','reference','mut_rates']].set_index('reference')
 
-        # merge per construct, use samples as suffix for columns
+        # merge per reference, use samples as suffix for columns
         data = pd.concat([data[s].rename(columns={'mut_rates': 'mut_rates_{}'.format(s)}) for s in samples], axis=1)
         data.drop(columns=['sample'], inplace=True)
 
@@ -930,14 +930,14 @@ def biological_replicates_histogram(study, bio_replicates_samples):
 ## c / v - Proportional
 # ---------------------------------------------------------------------------
 
-def change_in_temp_mut_frac_vs_temperature(study, samples, construct):
-    return __mut_frac_vs_sample_attr(study, samples, construct, 'temperature_k', 'Temperature (K)')
+def change_in_temp_mut_frac_vs_temperature(study, samples, reference):
+    return __mut_frac_vs_sample_attr(study, samples, reference, 'temperature_k', 'Temperature (K)')
     
-def change_in_reaction_time(study, samples, construct):
-    return __mut_frac_vs_sample_attr(study, samples, construct, 'inc_time_tot_secs', 'DMS incubation time (s)')
+def change_in_reaction_time(study, samples, reference):
+    return __mut_frac_vs_sample_attr(study, samples, reference, 'inc_time_tot_secs', 'DMS incubation time (s)')
 
-def change_in_dms_conc(study, samples, construct):
-    return __mut_frac_vs_sample_attr(study, samples, construct, 'DMS_conc_mM', 'DMS concentration (mM)')
+def change_in_dms_conc(study, samples, reference):
+    return __mut_frac_vs_sample_attr(study, samples, reference, 'DMS_conc_mM', 'DMS concentration (mM)')
 
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
@@ -1068,7 +1068,7 @@ def heatmap_across_family_members(study, sample):
     
     fig = go.Figure()
     
-    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')][['sample','family', 'construct', 'frame_shift_ROI', 'mut_rates','sequence']].reset_index(drop=True)
+    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')][['sample','family', 'reference', 'frame_shift_ROI', 'mut_rates','sequence']].reset_index(drop=True)
     # reference is the longest sequence of the family
     for family in big_data['family'].unique():
         reference = big_data[(big_data['family'] == family)].sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values[0]
@@ -1086,7 +1086,7 @@ def heatmap_across_family_members(study, sample):
         df = pd.DataFrame(
             columns = [base + str(idx + 1) for base, idx in zip(reference, range(len(reference)))],
             data = np.vstack(data['mut_rates'].values),
-            index = data['construct'].values 
+            index = data['reference'].values 
         ).sort_index(ascending=False)
         
         
@@ -1107,7 +1107,7 @@ def heatmap_across_family_members(study, sample):
             showscale = True,
             zmin = 0,
             zmax = 0.08,
-            hovertemplate = 'Construct: %{y}<br>Base: %{x}<br>Mutation fraction: %{z:.2f}<extra></extra>',
+            hovertemplate = 'reference: %{y}<br>Base: %{x}<br>Mutation fraction: %{z:.2f}<extra></extra>',
         ))
     
         
@@ -1161,7 +1161,7 @@ def heatmap_across_family_members(study, sample):
     plt.gca().xaxis.tick_top()
     sns.heatmap(df, annot=True, fmt='.2f')
     plt.title('Heatmap across family members with all bases - sample {} - family {}'.format(sample, family))
-    plt.ylabel('Construct')
+    plt.ylabel('reference')
     """
 
 def mut_rates_for_kfold(study, samples, family, stride = 'turner'):
@@ -1448,18 +1448,18 @@ def __correlation_scatter_plot(x, y, fig):
             showlegend=True, visible=False))
 
         
-def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
+def __mut_frac_vs_sample_attr(study, samples, reference, attr, x_label=None):
     # get data
     data = study.get_df(
         sample = samples,
-        construct=construct,
+        reference=reference,
         section='ROI',
         base_type = ['A','C']) 
 
     data = data[['sample','sequence','mut_rates','index_selected','structure','num_aligned',attr]]
     
     if len(data) == 0:
-        print('No data: samples:{}, construct:{}'.format(samples, construct))
+        print('No data: samples:{}, reference:{}'.format(samples, reference))
         return {'data': [], 'fig': go.Figure()}
     
     # turn it into a dataframe
@@ -1495,7 +1495,7 @@ def __mut_frac_vs_sample_attr(study, samples, construct, attr, x_label=None):
     ))
         
     fig.update_layout(
-        title='Construct: {}'.format(construct),
+        title='reference: {}'.format(reference),
         xaxis_title=x_label if x_label else attr,
         yaxis_title='Mutation fraction')
 

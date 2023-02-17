@@ -6,43 +6,43 @@ from scipy.optimize import curve_fit
 from scipy.stats import norm
 
 def generate_barcode_replicates_pairs(study, sample):
-    data = study.get_df(sample=sample, section = 'ROI')[['sequence', 'construct']]
+    data = study.get_df(sample=sample, section = 'ROI')[['sequence', 'reference']]
     replicates = {}
     for _, g in data.groupby('sequence'):
         if len(g) > 1:
             for _, row in g.iterrows():
-                replicates[row['construct']] = []
+                replicates[row['reference']] = []
                 for _, row2 in g.iterrows():
-                    if row2['construct'] != row['construct']:
-                        replicates[row['construct']].append(row2['construct'])
+                    if row2['reference'] != row['reference']:
+                        replicates[row['reference']].append(row2['reference'])
     return replicates
 
 
 def compute_pearson_scores(study, sample, replicates_lists, sections):
     scores = []
-    data = study.get_df(sample=sample, section = sections, base_type=['A','C'])[['sequence','construct','mut_rates']]
+    data = study.get_df(sample=sample, section = sections, base_type=['A','C'])[['sequence','reference','mut_rates']]
 
-    # make sure that each construct has the same number of sections
-    for c, g in data.groupby('construct'):
+    # make sure that each reference has the same number of sections
+    for c, g in data.groupby('reference'):
         if len(g) != len(sections) and c in replicates_lists:
             replicates_lists.pop(c)
     
-    df = data.groupby('construct').agg({'mut_rates': lambda x: x}).reset_index()
+    df = data.groupby('reference').agg({'mut_rates': lambda x: x}).reset_index()
     df['mut_rates'] = df['mut_rates'].apply(lambda x:np.concatenate(x))
     
-    for construct, replicates in replicates_lists.items():
-        scores_construct = []
-        x = df[df['construct'] == construct]['mut_rates'].iloc[0]
+    for reference, replicates in replicates_lists.items():
+        scores_reference = []
+        x = df[df['reference'] == reference]['mut_rates'].iloc[0]
         for replicate in replicates:
             if replicate not in replicates_lists.keys():
                 continue
-            y = df[df['construct'] == replicate]['mut_rates'].iloc[0]
-            scores_construct.append(custom_pearsonr(x, y))
-        scores.append(np.mean(scores_construct))
+            y = df[df['reference'] == replicate]['mut_rates'].iloc[0]
+            scores_reference.append(custom_pearsonr(x, y))
+        scores.append(np.mean(scores_reference))
 
     sorted_idx = np.argsort(scores)[::-1]
-    # return dict with construct names and scores as two sorted lists
-    return {'constructs': [list(replicates_lists.keys())[i] for i in sorted_idx], 'scores': [scores[i] for i in sorted_idx]}
+    # return dict with reference names and scores as two sorted lists
+    return {'references': [list(replicates_lists.keys())[i] for i in sorted_idx], 'scores': [scores[i] for i in sorted_idx]}
 
 
 def find_frame_shift_ROI(study):
@@ -50,7 +50,7 @@ def find_frame_shift_ROI(study):
     if 'frame_shift_ROI' in study.df.columns:
         study.df.drop('frame_shift_ROI', axis=1, inplace=True)
             
-    df = study.df[(study.df['section'] == 'ROI')][['sample','sequence', 'construct', 'family','section']].reset_index(drop=True)
+    df = study.df[(study.df['section'] == 'ROI')][['sample','sequence', 'reference', 'family','section']].reset_index(drop=True)
 
     for _, g in df.groupby(['sample','family']):
         g.sort_values('sequence', key=lambda x: x.str.len(), inplace=True, ascending=False)
@@ -66,7 +66,7 @@ def find_frame_shift_ROI(study):
         g.sort_values('sequence', key=lambda x: x.str.len(), inplace=True, ascending=False)
         assert g['frame_shift_ROI'].iloc[0] == 0, 'Frame shift is not 0 for reference sequence'
 
-    df = study.df.merge(df[['sample','construct','section','sequence','frame_shift_ROI']], on=['sample','construct','section','sequence'], how='left')
+    df = study.df.merge(df[['sample','reference','section','sequence','frame_shift_ROI']], on=['sample','reference','section','sequence'], how='left')
     return df
 
 
@@ -174,7 +174,7 @@ def compute_k_fold_fit(study, sample, family, stride='turner'):
     return df
     
     
-def compute_quality_score_construct_vs_family(study, sample, family, metric='pearson'):
+def compute_quality_score_reference_vs_family(study, sample, family, metric='pearson'):
     
     # Get the data
     data = study.get_df(sample=sample, family=family, section='ROI')
@@ -200,8 +200,8 @@ def compute_affine_transformation_for_replicates(study, samples):
     """
     df = study.get_df(sample=samples, section='ROI', base_type=['A','C'])
     
-    # remove the construct that are not in all samples
-    df = df.groupby('construct').filter(lambda x: len(x['sample'].unique()) == len(samples))
+    # remove the reference that are not in all samples
+    df = df.groupby('reference').filter(lambda x: len(x['sample'].unique()) == len(samples))
     
     data = {}
     for sample in samples:

@@ -13,11 +13,11 @@ class RNAstructure(object):
         self.rnastructure_path = rnastructure_path if rnastructure_path[-1] == '/' else rnastructure_path+'/'
         self.directory = 'temp/rnastructure/'
 
-    def fit(self, sequence, construct='construct'):
+    def fit(self, sequence, reference='reference'):
         self.sequence = sequence
         self.__make_temp_folder()
         self.__make_files()
-        self.__create_fasta_file(construct, sequence)
+        self.__create_fasta_file(reference, sequence)
 
     def predict_ensemble_energy(self):
         cmd = f"{self.rnastructure_path}EnsembleEnergy {self.fasta_file} --sequence"
@@ -41,7 +41,7 @@ class RNAstructure(object):
                     out["p"]+=[float(ls[2])]
         return self.__cast_pairing_prob(out)
 
-    def predict_construct_deltaG(self):
+    def predict_reference_deltaG(self):
         cmd = f"{self.rnastructure_path}Fold {self.fasta_file} {self.ct_file}"
         run_command(cmd)
         assert os.path.getsize(self.ct_file) != 0, f"{self.ct_file} is empty, check that RNAstructure works"
@@ -60,10 +60,10 @@ class RNAstructure(object):
         self.fasta_file = self.directory+'/'+temp_prefix+'.fasta'
         self.prob_file = self.directory+'/'+temp_prefix+'_prob.txt'
 
-    def __create_fasta_file(self, construct, sequence):
+    def __create_fasta_file(self, reference, sequence):
         # push the ref into a temp file
         temp_fasta = open(self.fasta_file, 'w')
-        temp_fasta.write('>'+construct+'\n'+sequence)
+        temp_fasta.write('>'+reference+'\n'+sequence)
         temp_fasta.close()
 
     # cast the temp file into a dot_bracket structure and extract the attributes
@@ -90,7 +90,7 @@ class RNAstructure(object):
                 deltaG, structure = f.readline().split()
         else:
             self.fit(sequence)
-            deltaG, structure = self.predict_construct_deltaG()
+            deltaG, structure = self.predict_reference_deltaG()
             with open(os.path.join(self.directory, sequence+'.txt'), 'w') as f:
                 f.write(f"{deltaG} {structure}")
         return deltaG, structure
@@ -98,6 +98,6 @@ class RNAstructure(object):
 if __name__ == "__main__":
     rna = RNAstructure('/Users/ymdt/src/RNAstructure/exe')
     rna.fit(sequence='AAGATATTCGAAAGAATATCTT')
-    print("DeltaG + structure:", rna.predict_construct_deltaG())
+    print("DeltaG + structure:", rna.predict_reference_deltaG())
     print("Ens. energy:", rna.predict_ensemble_energy())
     print("One line command:", rna.run('AAGATATTCGAAAGAATATCTT'))

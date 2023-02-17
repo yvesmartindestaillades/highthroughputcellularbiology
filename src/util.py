@@ -17,7 +17,7 @@ def fasta_to_df(fasta_file):
     lines = [l.strip() for l in lines]
     names = [l[1:] for l in lines if l.startswith('>')]
     seqs = [l for l in lines if not l.startswith('>')]
-    return pd.DataFrame({'construct': names, 'sequence': seqs})
+    return pd.DataFrame({'reference': names, 'sequence': seqs})
 
 def save_plotly_fig(cwd, filename, fig, format='html'):
     """Save a plotly figure and create the directory if it doesn't exists.
@@ -208,8 +208,8 @@ def compute_wilson_interval(p, n, z = 1.96):
     return (lower_bound, upper_bound)
 
 
-def family_from_construct(construct):
-    return construct.split('=')[1].split('-')[0]
+def family_from_reference(reference):
+    return reference.split('=')[1].split('-')[0]
 
 def compute_affine_transformation(s1, s2):
     """Compute the affine transformation that aligns s1 to s2.

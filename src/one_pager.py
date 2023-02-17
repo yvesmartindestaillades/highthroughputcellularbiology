@@ -9,10 +9,10 @@ from study_gen import study
 
 matplotlib.use('agg')
 
-def get_avg_pearson_score_for_construct_in_family(study, sample, construct, section):
-    family = util.family_from_construct(construct)
+def get_avg_pearson_score_for_reference_in_family(study, sample, reference, section):
+    family = util.family_from_reference(reference)
     data = plots.sample_replicates_heatmap_per_family(study, [sample,sample], family, section)['data']
-    score = data[construct].loc[~data.index.str.contains(construct)].mean()
+    score = data[reference].loc[~data.index.str.contains(reference)].mean()
     return score
 
 DEF_TEMP_FILE = 'temp.png'
@@ -78,25 +78,25 @@ def pearson_color_factory(pearson):
         return 'darkgreen'
     
 
-def generate_one_pager_construct(study, sample, construct, output_dir):
+def generate_one_pager_reference(study, sample, reference, output_dir):
     
-    family = util.family_from_construct(construct)
+    family = util.family_from_reference(reference)
 
     # Get data
-    data = study.get_df(sample=sample, section='ROI', construct=construct)
-    assert len(data) <= 1, 'More than one sequence found for {} - {}'.format(sample, construct)
-    assert len(data) > 0, 'No sequence found for {} - {}'.format(sample, construct)
+    data = study.get_df(sample=sample, section='ROI', reference=reference)
+    assert len(data) <= 1, 'More than one sequence found for {} - {}'.format(sample, reference)
+    assert len(data) > 0, 'No sequence found for {} - {}'.format(sample, reference)
     data = data.iloc[0]
 
-    # Construct info
-    construct = construct
+    # reference info
+    reference = reference
     sequence = data['sequence']
     type = 'Canonical base pair'
     gc_content = '{:.2f}%'.format(100*np.array([base in ['G','C'] for base in sequence]).mean())
     deltaG = data['deltaG']
     print('DeltaG: {}'.format(deltaG))
-    print('Construct info \n--------------')
-    print('Construct: {}'.format(construct))
+    print('reference info \n--------------')
+    print('reference: {}'.format(reference))
     print('Sequence: {}'.format(sequence))
     print('Type: {}'.format(type))
     print('GC content: {}'.format(gc_content))
@@ -121,8 +121,8 @@ def generate_one_pager_construct(study, sample, construct, output_dir):
 
     # Quality control
     num_reads = data['num_aligned']
-    pearson_R_5_hp = get_avg_pearson_score_for_construct_in_family(study, sample, construct, 'MS2')
-    pearson_R_3_hp = get_avg_pearson_score_for_construct_in_family(study, sample, construct, 'LAH')
+    pearson_R_5_hp = get_avg_pearson_score_for_reference_in_family(study, sample, reference, 'MS2')
+    pearson_R_3_hp = get_avg_pearson_score_for_reference_in_family(study, sample, reference, 'LAH')
     print('Quality control \n---------------')
     print('Number of reads: {}'.format(num_reads))
     print('Pearson R 5 hp: {}'.format(pearson_R_5_hp))
@@ -132,12 +132,12 @@ def generate_one_pager_construct(study, sample, construct, output_dir):
     ## Plots
     figs = {}
     images = {}
-    figs['read_coverage_per_position'] = plots.read_coverage_per_position(study, sample, construct)['fig']
-    figs['mutation_fraction_at_each_position'] = plots.mutation_fraction_at_each_position(study, sample, construct)['fig']
-    figs['mutation_identity_at_each_position'] = plots.mutation_identity_at_each_position(study, sample, construct)['fig']
-    figs['mutation_per_read_per_construct'] = plots.mutation_per_read_per_construct(study, sample, construct)['fig']
+    figs['read_coverage_per_position'] = plots.read_coverage_per_position(study, sample, reference)['fig']
+    figs['mutation_fraction_at_each_position'] = plots.mutation_fraction_at_each_position(study, sample, reference)['fig']
+    figs['mutation_identity_at_each_position'] = plots.mutation_identity_at_each_position(study, sample, reference)['fig']
+    figs['mutation_per_read_per_reference'] = plots.mutation_per_read_per_reference(study, sample, reference)['fig']
     for fig_name, fig in figs.items():
-        if fig_name != 'mutation_per_read_per_construct':
+        if fig_name != 'mutation_per_read_per_reference':
             fig['layout']['annotations'][0]['font']['size'] = 35
         else:
             fig['layout']['title']['font']['size'] = 35
@@ -149,11 +149,11 @@ def generate_one_pager_construct(study, sample, construct, output_dir):
         'read_coverage_per_position': 'A',
         'mutation_fraction_at_each_position': 'D',
         'mutation_identity_at_each_position': 'C',
-        'mutation_per_read_per_construct': 'B'}
+        'mutation_per_read_per_reference': 'B'}
 
 
     tab = plt.table(
-        cellText=[['Construct', construct],
+        cellText=[['reference', reference],
                     ['Sequence', sequence],
                     ['Type', type],
                     ['GC content', gc_content],
@@ -173,10 +173,10 @@ def generate_one_pager_construct(study, sample, construct, output_dir):
         if (row == 0) or (col == 0):
             cell.set_text_props(weight='bold')    
 
-    plt.title('Construct info', fontsize=20, fontweight='bold')
+    plt.title('reference info', fontsize=20, fontweight='bold')
     plt.axis('off')
-    plot_to_letter['construct_info'] = 'K'
-    images['construct_info'] = convert_matplotlib_to_image()
+    plot_to_letter['reference_info'] = 'K'
+    images['reference_info'] = convert_matplotlib_to_image()
 
     tab = plt.table(
         cellText=[['Library', library],
@@ -249,7 +249,7 @@ def generate_one_pager_construct(study, sample, construct, output_dir):
         plt.tight_layout()
     plt.show()
     plt.tight_layout()
-    out_file = os.path.join(output_dir, '{}_{}.pdf'.format(construct, sample))
+    out_file = os.path.join(output_dir, '{}_{}.pdf'.format(reference, sample))
     if os.path.isfile(out_file):
         os.system('rm {}'.format(out_file))
     plt.savefig(out_file, bbox_inches='tight', pad_inches=0)
@@ -261,13 +261,13 @@ if __name__ == '__main__':
     # Parameters
     ###############
     sample = 'lauren470_S1'
-    construct = '3042-O-flank_1=hp1-DB'
+    reference = '3042-O-flank_1=hp1-DB'
     output_dir = ''
     ###############
 
-    generate_one_pager_construct(
+    generate_one_pager_reference(
         study=study,
         sample=sample,
-        construct=construct,
+        reference=reference,
         output_dir=output_dir
     )

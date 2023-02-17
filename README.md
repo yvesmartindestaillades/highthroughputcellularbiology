@@ -79,7 +79,7 @@ Each notebook is a self-contained script that can be run independently. The note
 ### How to run the notebooks
 1. Open the notebook in your favorite editor (e.g. VSCode, PyCharm, Jupyter Notebook, etc.)
 2. Run the first cell to import the libraries and the functions
-3. Some plots maybe require some inputs, e.g a sample, a construct, etc. Just change the value as you need.
+3. Some plots maybe require some inputs, e.g a sample, a reference, etc. Just change the value as you need.
 
 Ex: 
 
@@ -90,8 +90,8 @@ sample = '01_02_S23_reads'
 
 plot = plots.barcode_comparison_scatter_plot(study, sample)
 ```
-### How to get the list of samples, families, constructs, sections etc
-The list of samples, families, and constructs are stored in the handbook `notebooks/misc/handbook.ipynb`. Just print the corresponding cell to get the list.
+### How to get the list of samples, families, references, sections etc
+The list of samples, families, and references are stored in the handbook `notebooks/misc/handbook.ipynb`. Just print the corresponding cell to get the list.
 
 ### How to extract the data from the dataframe
 DREEM's object `study` provides a filtering function called `get_df`. This function returns a dataframe with the filtered data. Check `notebooks/misc/handbook.ipynb`. for more details.
