@@ -94,9 +94,9 @@ def compute_mutation_rates(df):
     mut_rates = []
     for col in df.columns:
         col = df[col]
-        num_of_mutations = col[col.notna()].astype(int).sum()
+        sub_hist = col[col.notna()].astype(int).sum()
         num_of_reads = col[col.notna()].astype(int).count()
-        mut_rate = round(num_of_mutations / num_of_reads, 6)
+        mut_rate = round(sub_hist / num_of_reads, 6)
         mut_rates.append(mut_rate)
     return mut_rates
 

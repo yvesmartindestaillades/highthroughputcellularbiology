@@ -20,23 +20,23 @@ def generate_barcode_replicates_pairs(study, sample):
 
 def compute_pearson_scores(study, sample, replicates_lists, sections):
     scores = []
-    data = study.get_df(sample=sample, section = sections, base_type=['A','C'])[['sequence','reference','mut_rates']]
+    data = study.get_df(sample=sample, section = sections, base_type=['A','C'], index_selected=True)[['sequence','reference','sub_rate','index_selected']]
 
     # make sure that each reference has the same number of sections
     for c, g in data.groupby('reference'):
         if len(g) != len(sections) and c in replicates_lists:
             replicates_lists.pop(c)
     
-    df = data.groupby('reference').agg({'mut_rates': lambda x: x}).reset_index()
-    df['mut_rates'] = df['mut_rates'].apply(lambda x:np.concatenate(x))
+    df = data.groupby('reference').agg({'sub_rate': lambda x: x}).reset_index()
+    df['sub_rate'] = df['sub_rate'].apply(lambda x:np.concatenate(x))
     
     for reference, replicates in replicates_lists.items():
         scores_reference = []
-        x = df[df['reference'] == reference]['mut_rates'].iloc[0]
+        x = df[df['reference'] == reference]['sub_rate'].iloc[0]
         for replicate in replicates:
             if replicate not in replicates_lists.keys():
                 continue
-            y = df[df['reference'] == replicate]['mut_rates'].iloc[0]
+            y = df[df['reference'] == replicate]['sub_rate'].iloc[0]
             scores_reference.append(custom_pearsonr(x, y))
         scores.append(np.mean(scores_reference))
 
@@ -72,7 +72,7 @@ def find_frame_shift_ROI(study):
 
 def select_data_for_kfold(study, sample, family, stride='turner'):
     
-    data = study.get_df(sample=sample, family=family, section='ROI') #TODO remove unpaired bases
+    data = study.get_df(sample=sample, family=family, section='ROI', index_selected=True) #TODO remove unpaired bases
 
     data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
 
@@ -81,7 +81,7 @@ def select_data_for_kfold(study, sample, family, stride='turner'):
     # turn it into a dataframe
     df = pd.DataFrame(
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['sub_rate'])],
         index= data['deltaG'].values
     )
 
@@ -205,7 +205,7 @@ def compute_affine_transformation_for_replicates(study, samples):
     
     data = {}
     for sample in samples:
-        data[sample] = np.concatenate(df[df['sample']==sample]['mut_rates'].values).reshape(-1, 1)
+        data[sample] = np.concatenate(df[df['sample']==sample]['sub_rate'].values).reshape(-1, 1)
     
     # Compute the linear transformation with the first sample as reference
     ref = data[samples[0]]

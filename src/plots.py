@@ -34,7 +34,7 @@ def mutations_in_barcodes(study):
     data = study.df[study.df['section'] == 'barcode']
 
     for sample in data['sample'].unique():
-        hist = np.sum(np.stack(data[data['sample']==sample]['num_of_mutations'].values), axis=0)
+        hist = np.sum(np.stack(data[data['sample']==sample]['sub_hist'].values), axis=0)
         bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
         
         fig.add_trace(
@@ -67,7 +67,7 @@ def mutations_in_barcodes(study):
                 )
             ])
     
-    return {'fig': fig, 'data': data[['sample','reference','num_of_mutations']]}
+    return {'fig': fig, 'data': data[['sample','reference','sub_hist']]}
 
 def num_aligned_reads_per_reference_frequency_distribution(study, sample):
     num_aligned_reads = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_aligned'].to_list()
@@ -86,7 +86,7 @@ def num_aligned_reads_per_reference(study, sample):
 ## b / ii - DMS-MaPseq
 # ---------------------------------------------------------------------------
 def _mutations_per_read_subplot(study, sample):
-    data = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+    data = study.df[(study.df['sample']==sample) & (study.df['section']=='full')]['sub_hist'].reset_index(drop=True)
     hist = np.sum(np.stack(data.values), axis=0)
     bin_edges = np.arange(0, max(np.argwhere(hist != 0)), 1)
     return go.Bar( x=bin_edges, y=hist, showlegend=False, marker_color='indianred')
@@ -105,11 +105,11 @@ def mutations_per_read_per_sample(study, unique_samples):
     fig.update_layout(autosize=True, height=len(unique_samples)*500, title='Number of mutation per read across samples')
     return {
         'fig':fig,
-        'data':study.df[study.df['section']=='full'][['sample','reference','num_of_mutations']]
+        'data':study.df[study.df['section']=='full'][['sample','reference','sub_hist']]
         }
     
 def mutation_per_read_per_reference(study, sample, reference):
-    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference) & (study.df['section']=='full')]['num_of_mutations'].reset_index(drop=True)
+    data = study.df[(study.df['sample']==sample) & (study.df['reference']==reference) & (study.df['section']=='full')]['sub_hist'].reset_index(drop=True)
     if len(data) == 0:
         return None
     data = data.iloc[0]
@@ -132,18 +132,18 @@ def _mutation_identity_at_each_position_subplot(study, sample, reference, sectio
     stacked_bar = []
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
 
-    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in data['mut_rates']]
-    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['mut_rates']]
+    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in data['sub_rate']]
+    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['sub_rate']]
 
     for base in ['A','C','G','T']:
-        df[base] = np.array(data['mod_bases_'+base])/np.array(data['info_bases'])
+        df[base] = np.array(data['sub_'+base])/np.array(data['info'])
         stacked_bar.append( go.Bar(x=np.arange(len(data['sequence'])), y=list(df[base]), marker_color=color_map[base], showlegend=False) )
     
     # add error bars to stacked_bar[-1]
     stacked_bar[-1]['error_y'] = dict(
         type='data',
-        array= [data['err_max'][i]-data['mut_rates'][i] for i in range(len(data['sequence']))],
-        arrayminus = [data['mut_rates'][i]-data['err_min'][i] for i in range(len(data['sequence']))],
+        array= [data['err_max'][i]-data['sub_rate'][i] for i in range(len(data['sequence']))],
+        arrayminus = [data['sub_rate'][i]-data['err_min'][i] for i in range(len(data['sequence']))],
         visible=True,
         symmetric=False,
         thickness=1.5,
@@ -183,7 +183,7 @@ def mutation_identity_at_each_position(study, sample, unique_references, section
             (study.df['sample']==sample)&
             (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','reference','mod_bases_A','mod_bases_C','mod_bases_G','mod_bases_T','num_aligned']]
+        [['sample','reference','sub_A','sub_C','sub_G','sub_T','num_aligned']]
         }
     return plot
 
@@ -200,12 +200,12 @@ def _mutation_fraction_at_each_position_subplot(study, sample, reference, sectio
     df, df_err_min, df_err_max = pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence'])), pd.DataFrame(index = list(data['sequence']))
     stacked_bar = []
     
-    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in  data['mut_rates']]
-    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['mut_rates']]
+    data['err_min'] = [compute_wilson_interval(p, data['num_aligned'])[0] for p in  data['sub_rate']]
+    data['err_max'] = [compute_wilson_interval(p, data['num_aligned'])[1] for p in data['sub_rate']]
 
     color_map={'A':'red','C':'blue','G':'yellow','T':'green'}
     for base in ['A','C','G','T']:
-        for d, col in zip([df, df_err_min, df_err_max], ['mut_rates', 'err_min', 'err_max']):
+        for d, col in zip([df, df_err_min, df_err_max], ['sub_rate', 'err_min', 'err_max']):
             d[base] = [mr if b==base  else np.nan for mr, b in zip(data[col], data['sequence'])]
         stacked_bar.append(
             go.Bar
@@ -249,7 +249,7 @@ def mutation_fraction_at_each_position(study, sample, unique_references, section
             (study.df['sample']==sample)&
             (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','reference','mut_rates','num_aligned']]
+        [['sample','reference','sub_rate','num_aligned']]
         }
     
     return plot
@@ -264,7 +264,7 @@ def _read_coverage_per_position_subplot(study, sample, reference):
 
     scatters = []
     for i, (s, ss, se) in enumerate(zip(sections, section_start, section_end)):
-        y_data = copy.copy(data[data['section']==s]['cov_bases'].values[0])
+        y_data = copy.copy(data[data['section']==s]['cov'].values[0])
         if s=='full':
             y_data[min(section_start[1:]-1):max(section_end[1:])] = np.zeros(max(section_end[1:])-min(section_start[1:])+1)
         scatters.append(
@@ -304,7 +304,7 @@ def read_coverage_per_position(study, sample, unique_references):
             (study.df['sample']==sample)&
             (study.df['reference'].isin(unique_references))&
             (study.df['section']=='full')]\
-        [['sample','reference','cov_bases']]
+        [['sample','reference','cov']]
         }
 
     return plot
@@ -335,7 +335,7 @@ def distribution_of_the_mean(means, residues_set, bounds):
 def replicates_fisher_pearson_decorator(function):
     def replicates_fisher_pearson(study, sample):
         replicates_lists, data, title = function(study, sample)
-        data['mut_rates'] = data.apply(lambda x: [x['mut_rates'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']], axis=1)
+        data['sub_rate'] = data.apply(lambda x: [x['sub_rate'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']], axis=1)
         data.reset_index(inplace=True, drop=True)
 
         p_values_true_data = []
@@ -378,8 +378,8 @@ def replicates_fisher_pearson_decorator(function):
                 # using the true data
                 n1 = data[data['reference'] == reference]['num_aligned'].values[0]
                 n2 = data[data['reference'] == replicate]['num_aligned'].values[0]
-                mr1 = data[data['reference'] == reference]['mut_rates'].values[0]
-                mr2 = data[data['reference'] == replicate]['mut_rates'].values[0]
+                mr1 = data[data['reference'] == reference]['sub_rate'].values[0]
+                mr2 = data[data['reference'] == replicate]['sub_rate'].values[0]
 
                 p_values_true_data.append(fisher_compute_and_combine_pvalues(n1, mr1, n2, mr2))
                 pearsonr_true_data.append(stats.pearsonr(mr1, mr2)[0])
@@ -418,10 +418,10 @@ def replicates_fisher_pearson_decorator(function):
 @replicates_fisher_pearson_decorator
 def barcodes_replicates_fisher_pearson(study, sample):
     replicates_lists = generate_dataset.generate_barcode_replicates_pairs(study, sample)       
-    data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'full')][['sample','reference','section','mut_rates','num_aligned','sequence']]
+    data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'full')][['sample','reference','section','sub_rate','num_aligned','sequence']]
     barcode_bounds = [139,151]
 
-    for col in ['mut_rates','sequence']:
+    for col in ['sub_rate','sequence']:
         data[col] = data[col].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
         
     title = 'Similarity test between barcode replicates using Pearson correlation and Fisher exact test for sample {}'.format(sample)
@@ -430,7 +430,7 @@ def barcodes_replicates_fisher_pearson(study, sample):
 
 @replicates_fisher_pearson_decorator
 def biological_replicates_fisher_pearson(study, sample):
-    data = study.df[(study.df['sample'].isin(sample)) & (study.df['section'] == 'full')][['sample','reference','section','mut_rates','num_aligned','sequence']]
+    data = study.df[(study.df['sample'].isin(sample)) & (study.df['section'] == 'full')][['sample','reference','section','sub_rate','num_aligned','sequence']]
     if sample[0] != sample[1]:
         data = data.groupby('reference').filter(lambda x: len(x) == 2)
     replicates_lists = {reference+'_'+sample[0]: [reference+'_'+sample[1]] for reference in data['reference'].unique()}
@@ -464,13 +464,13 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     
     data = study.get_df(
             sample = sample, 
-            section = 'full')[['sample','reference','section','mut_rates','sequence']]
+            section = 'full')[['sample','reference','section','sub_rate','sequence']]
     
 
-    for col in ['mut_rates','sequence']:
+    for col in ['sub_rate','sequence']:
         data[col] = data[col].apply(lambda x: np.array(x[:barcode_bounds[0]]).tolist() + np.array(x[barcode_bounds[1]:]).tolist())
     
-    data['mut_rates'] = data.apply(lambda x: np.array([x['mut_rates'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']]), axis=1)    
+    data['sub_rate'] = data.apply(lambda x: np.array([x['sub_rate'][i] for i in range(len(x['sequence'])) if x['sequence'][i] in ['A','C']]), axis=1)    
     
     showed_pairs = []
     uniquepairs = []
@@ -479,8 +479,8 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
             if not (replicate, reference) in showed_pairs:
                 
                 uniquepairs.append((reference, replicate))
-                x = data[data['reference']==reference]['mut_rates'].values[0]
-                y = data[data['reference']==replicate]['mut_rates'].values[0]
+                x = data[data['reference']==reference]['sub_rate'].values[0]
+                y = data[data['reference']==replicate]['sub_rate'].values[0]
                 
                 assert len(x) == len(y), 'The length of the two replicates are not the same: {} vs {}'.format(len(x), len(y))
 
@@ -548,7 +548,7 @@ def barcode_comparison_scatter_plot(study, sample): #TODO
     data = study.get_df(
             sample = sample, 
             section = 'full', 
-            base_type = ['A','C'])[['sample','reference','mut_rates']]
+            base_type = ['A','C'])[['sample','reference','sub_rate']]
     
     return {'fig': fig, 'data': data}
     
@@ -683,19 +683,19 @@ def bio_replicates_per_reference(study, samples, family, correct_bias=False):
         reference = unique_references,
         base_type = ['A','C'],
         section='full'
-        )[['sample','reference', 'mut_rates']]
+        )[['sample','reference', 'sub_rate']]
     
     if correct_bias:
-        mut_rates = {}
+        sub_rate = {}
         for sample in samples:
-            mut_rates[sample] = big_data[big_data['sample']==sample]['mut_rates'].values[0]
+            sub_rate[sample] = big_data[big_data['sample']==sample]['sub_rate'].values[0]
     
     for reference in unique_references:
         # add pearson correlation and r2 in big_data columns
         data = big_data.loc[big_data['reference'] == reference]
         if len(data) == 2:
-            big_data.loc[big_data['reference'] == reference, 'pearson'] = custom_pearsonr(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
-            big_data.loc[big_data['reference'] == reference, 'r2'] = r2_score(data['mut_rates'].iloc[0], data['mut_rates'].iloc[1])
+            big_data.loc[big_data['reference'] == reference, 'pearson'] = custom_pearsonr(data['sub_rate'].iloc[0], data['sub_rate'].iloc[1])
+            big_data.loc[big_data['reference'] == reference, 'r2'] = r2_score(data['sub_rate'].iloc[0], data['sub_rate'].iloc[1])
     
     assert len(unique_references) > 0, 'No references found for the given samples and family'
     
@@ -709,8 +709,8 @@ def bio_replicates_per_reference(study, samples, family, correct_bias=False):
         if not len(data) == 2:
             continue
         
-        x=data['mut_rates'].iloc[0]
-        y=data['mut_rates'].iloc[1]
+        x=data['sub_rate'].iloc[0]
+        y=data['sub_rate'].iloc[1]
         
         # Plot the scatter plot of the two replicates
         fig.add_trace(
@@ -748,8 +748,8 @@ def bio_replicates_per_reference(study, samples, family, correct_bias=False):
             
         # Plot the correlation line and y=x line
         __correlation_scatter_plot(
-            x = data['mut_rates'].iloc[0],
-            y = data['mut_rates'].iloc[1],
+            x = data['sub_rate'].iloc[0],
+            y = data['sub_rate'].iloc[1],
             fig=fig
             )
 
@@ -815,7 +815,7 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             family=family, 
             base_type=['A','C'])
         
-        data = data[['sample','reference','section','mut_rates','sequence']]
+        data = data[['sample','reference','section','sub_rate','sequence']]
 
         
     if section == 'ROI':
@@ -825,11 +825,11 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
             section=section, 
             family=family)
         
-        data = data[['sample','reference','section','mut_rates','frame_shift_ROI','sequence']]
+        data = data[['sample','reference','section','sub_rate','frame_shift_ROI','sequence']]
     
     if section == 'ROI':
         reference = data[data['sample'] == samples[0]].iloc[0]['sequence']
-        data['mut_rates'] = data.apply(lambda row: int(row['frame_shift_ROI'])*[np.nan] + list(row['mut_rates']) + (len(reference) - int(row['frame_shift_ROI']) - len(row['mut_rates']))*[np.nan], axis=1)
+        data['sub_rate'] = data.apply(lambda row: int(row['frame_shift_ROI'])*[np.nan] + list(row['sub_rate']) + (len(reference) - int(row['frame_shift_ROI']) - len(row['sub_rate']))*[np.nan], axis=1)
 
     data_sample_0 = data[data['sample'] == samples[0]].reset_index(drop=True)
     data_sample_1 = data[data['sample'] == samples[1]].reset_index(drop=True)
@@ -841,7 +841,7 @@ def sample_replicates_heatmap_per_family(study, samples, family, section):
         
     for _, row in data_sample_0.iterrows():
         for _, row2 in data_sample_1.iterrows():
-            df.loc[row['reference'], row2['reference']] = custom_pearsonr(row['mut_rates'], row2['mut_rates'])
+            df.loc[row['reference'], row2['reference']] = custom_pearsonr(row['sub_rate'], row2['sub_rate'])
                                 
     fig = px.imshow(
                 df, 
@@ -867,10 +867,10 @@ def biological_replicates_histogram(study, bio_replicates_samples):
     for samples in bio_replicates_samples:
         data = {}
         for s in samples:
-            data[s] = study.df[(study.df['sample'] == s) & (study.df['section'] == 'full')][['sample','reference','mut_rates']].set_index('reference')
+            data[s] = study.df[(study.df['sample'] == s) & (study.df['section'] == 'full')][['sample','reference','sub_rate']].set_index('reference')
 
         # merge per reference, use samples as suffix for columns
-        data = pd.concat([data[s].rename(columns={'mut_rates': 'mut_rates_{}'.format(s)}) for s in samples], axis=1)
+        data = pd.concat([data[s].rename(columns={'sub_rate': 'sub_rate_{}'.format(s)}) for s in samples], axis=1)
         data.drop(columns=['sample'], inplace=True)
 
         def pearson_score_average(list_of_replicates):
@@ -942,14 +942,14 @@ def change_in_dms_conc(study, samples, reference):
 def mut_rate_across_family_vs_deltaG(study, sample, family):
     
     # get a neat dataframe with the mutation rates for each base at each deltaG
-    data = study.get_df(sample=sample, family=family, section='ROI')
+    data = study.get_df(sample=sample, family=family, section='ROI', index_selected=True)
     
     data['deltaG'] = data['deltaG'].apply(lambda x: 0 if x == 'void' else float(x))
     
     # turn it into a dataframe
     df = pd.DataFrame(
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['mut_rates'])],
+        data = [int(offset)*[np.nan] + list(mr) for offset, mr in zip(data['frame_shift_ROI'], data['sub_rate'])],
         index= data['deltaG'].values
     )
     
@@ -1068,11 +1068,11 @@ def heatmap_across_family_members(study, sample):
     
     fig = go.Figure()
     
-    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')][['sample','family', 'reference', 'frame_shift_ROI', 'mut_rates','sequence']].reset_index(drop=True)
+    big_data = study.df[(study.df['sample'] == sample) & (study.df['section'] == 'ROI')][['sample','family', 'reference', 'frame_shift_ROI', 'sub_rate','sequence']].reset_index(drop=True)
     # reference is the longest sequence of the family
     for family in big_data['family'].unique():
         reference = big_data[(big_data['family'] == family)].sort_values('sequence', key=lambda x: x.str.len(), ascending=False)['sequence'].values[0]
-        big_data.loc[big_data['family']==family, 'mut_rates'] = big_data[big_data['family']==family].apply(lambda x: np.array(int(x['frame_shift_ROI'])*[np.nan] + list(x['mut_rates']) + [np.nan]*(len(reference)-int(x['frame_shift_ROI'])-len(x['mut_rates']))), axis=1)
+        big_data.loc[big_data['family']==family, 'sub_rate'] = big_data[big_data['family']==family].apply(lambda x: np.array(int(x['frame_shift_ROI'])*[np.nan] + list(x['sub_rate']) + [np.nan]*(len(reference)-int(x['frame_shift_ROI'])-len(x['sub_rate']))), axis=1)
     
     # add each family as a plot but show only one at the time
     for family in big_data['family'].unique():
@@ -1085,7 +1085,7 @@ def heatmap_across_family_members(study, sample):
                 
         df = pd.DataFrame(
             columns = [base + str(idx + 1) for base, idx in zip(reference, range(len(reference)))],
-            data = np.vstack(data['mut_rates'].values),
+            data = np.vstack(data['sub_rate'].values),
             index = data['reference'].values 
         ).sort_index(ascending=False)
         
@@ -1164,7 +1164,7 @@ def heatmap_across_family_members(study, sample):
     plt.ylabel('reference')
     """
 
-def mut_rates_for_kfold(study, samples, family, stride = 'turner'):
+def sub_rate_for_kfold(study, samples, family, stride = 'turner'):
     
     assert stride in ['turner', 'child#'], 'stride must be either "turner" or "child#"'
     
@@ -1456,7 +1456,7 @@ def __mut_frac_vs_sample_attr(study, samples, reference, attr, x_label=None):
         section='ROI',
         base_type = ['A','C']) 
 
-    data = data[['sample','sequence','mut_rates','index_selected','structure','num_aligned',attr]]
+    data = data[['sample','sequence','sub_rate','index_selected','structure','num_aligned',attr]]
     
     if len(data) == 0:
         print('No data: samples:{}, reference:{}'.format(samples, reference))
@@ -1465,7 +1465,7 @@ def __mut_frac_vs_sample_attr(study, samples, reference, attr, x_label=None):
     # turn it into a dataframe
     df = pd.DataFrame(
         columns= [base + str(idx+1) for base, idx in zip(data['sequence'].iloc[0], data['index_selected'].iloc[0])],
-        data = np.array(data['mut_rates'].tolist()),
+        data = np.array(data['sub_rate'].tolist()),
         index= data[attr].values
     ).sort_index().rename_axis(index=attr)
     

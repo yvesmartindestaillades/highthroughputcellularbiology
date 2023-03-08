@@ -19,7 +19,7 @@ if not os.path.exists(saved_feather):
     print('Done creating study.')
     
     print('Filtering study...')
-    study.df = study.df[study.df['worst_cov_bases'] > min_base_coverage].reset_index(drop=True)
+    study.df = study.df[study.df['min_cov'] > min_base_coverage].reset_index(drop=True)
     # only keep the references that have 8 sections 
     study.df = study.df[study.df['reference'].isin(study.df.groupby(['sample','reference']).filter(lambda x: len(x) == 8)['reference'])].reset_index(drop=True)
     print('Finding frame shift ROI...')
