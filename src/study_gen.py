@@ -35,3 +35,4 @@ else:
     study.df = pd.read_feather(saved_feather)
     print('Done reading study from df.feather.')
 
+study.df['family'] = study.df['reference'].apply(lambda x: x.split('=')[1].split('-')[0]) 
